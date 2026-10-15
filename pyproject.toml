@@ -1,0 +1,28 @@
+[project]
+name = "legal-agreement-ai"
+version = "0.1.0"
+description = "Experiment 3 (retrieval pipeline) for the AI legal-agreement drafting prototype"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "torch>=2.6",                       # >=2.6 to load .bin checkpoints (CVE-2025-32434); install the CUDA build
+    "sentence-transformers>=3.4,<5.0",
+    "transformers>=4.51,<4.58",         # 4.51+ for Qwen3-Embedding; 4.57 tested
+    "rank-bm25>=0.2.2",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "networkx>=3.3",
+    "pyyaml>=6.0",
+    "requests>=2.32",
+    "tqdm>=4.66",
+    "huggingface-hub>=0.26",
+    "tabulate>=0.9",
+    "matplotlib>=3.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

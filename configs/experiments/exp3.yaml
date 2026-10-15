@@ -1,0 +1,29 @@
+# Experiment 3: retrieval pipeline vs naive RAG (docs/project-plan.md section 5.4; README sections 2.4.4 and 2.7).
+# The "Experiment Switchboard": each condition switches chunking, retriever, embedder, reranker,
+# query rewrite, contextual enrichment and graph expansion on or off.
+# R0 (no retrieval) has no retrieval metrics; it appears only in the generation/grounding eval.
+
+datasets:
+  - synthetic      # our Singapore-context clause library and staff requests (test split for headline numbers)
+  - acord-test     # ACORD, 57 test queries, graded 0-4
+  - lbr-mini       # LegalBench-RAG-mini, 776 queries, character-level spans
+
+llm: qwen2.5:7b    # local, via Ollama: contextual retrieval, query rewrite, generation eval
+reranker: BAAI/bge-reranker-v2-m3
+graph_token_budget: 1200
+graph_seeds: 5
+
+conditions:
+  Ref-BM25: {chunking: clause, retriever: bm25, description: "Reference: BM25 only, clause-level chunks"}
+  R1:  {chunking: fixed, retriever: dense, embedder: bge-m3, description: "Naive RAG: fixed ~512-token chunks, dense search"}
+  R2:  {chunking: clause, retriever: dense, embedder: bge-m3, description: "Clause-level chunking + dense"}
+  R3:  {chunking: clause, retriever: hybrid, embedder: bge-m3, description: "R2 + BM25 hybrid (RRF)"}
+  R4:  {chunking: clause, retriever: hybrid, embedder: bge-m3, rerank: true, description: "R3 + cross-encoder reranker"}
+  R4e: {chunking: clause, retriever: hybrid, embedder: qwen3-emb-0.6b, rerank: true, description: "R4 with Qwen3-Embedding-0.6B instead of BGE-M3"}
+  R4q: {chunking: clause, retriever: hybrid, embedder: bge-m3, rerank: true, query_rewrite: true, description: "R4 + LLM doctrinal query rewrite"}
+  R5:  {chunking: clause, retriever: hybrid, embedder: bge-m3, rerank: true, contextual: auto, skip: [acord-test],
+        description: "R4 + contextual enrichment (chunk context on synthetic, SAC document summary on LBR)"}
+  R6a: {graph: bfs, description: "R5 seeds + BFS depth 2 over DEFINED_IN / REFERS_TO (synthetic only)"}
+  R6b: {graph: ppr, description: "R5 seeds + Personalized PageRank (synthetic only)"}
+  R6c: {graph: astar, description: "R5 seeds + A* expansion, admissible h (synthetic only)"}
+  R6d: {graph: astar_tuned, description: "R6c with lambda, mu tuned on the dev split (synthetic only)"}
