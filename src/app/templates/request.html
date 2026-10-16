@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% from "_macros.html" import status_badge, route_badge %}
 {% block title %}{{ r.ref }} · Legal Agreement AI{% endblock %}
+{% block head %}{% if r.status == "QUEUED" %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
 {% block content %}
 <div class="btn-row">
   <h1>{{ r.ref }}</h1> {{ status_badge(r.status) }} {{ route_badge(r.route) }}
 </div>
 <p class="muted">{{ r.agreement_type }} with <strong>{{ r.form.get('counterparty_name') or 'unknown counterparty' }}</strong>, submitted by {{ r.requester }} at {{ r.created_at[:19] | replace('T', ' ') }} UTC.</p>
+{% if r.status == 'QUEUED' %}<div class="alert info">Drafting in progress: a worker is preparing this draft. The page refreshes every 5 seconds.</div>{% endif %}
 {% if request.query_params.get('error') %}<div class="alert bad">{{ request.query_params.get('error') }}</div>{% endif %}
 
 <div class="grid g2">
