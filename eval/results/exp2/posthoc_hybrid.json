@@ -1,0 +1,34 @@
+{
+ "H-det (reference)": {
+  "success": 0.4444444444444444,
+  "defect_recall": 0.7926829268292683,
+  "false_alarm_on_clean": 0.0,
+  "route_correct": 0.8888888888888888,
+  "ask_recall": 0.6865079365079364,
+  "detect_unsupported_clause": 0.0
+ },
+ "H-det + H0 unsupported flags": {
+  "success": 0.4185185185185185,
+  "defect_recall": 0.9837398373983739,
+  "false_alarm_on_clean": 0.3673469387755102,
+  "route_correct": 0.7777777777777778,
+  "ask_recall": 0.6865079365079364,
+  "detect_unsupported_clause": 0.9333333333333332
+ },
+ "H-det + H1 unsupported flags": {
+  "success": 0.3333333333333333,
+  "defect_recall": 1.0,
+  "false_alarm_on_clean": 0.6530612244897959,
+  "route_correct": 0.6962962962962963,
+  "ask_recall": 0.6865079365079364,
+  "detect_unsupported_clause": 1.0
+ },
+ "H-det + H3b unsupported flags": {
+  "success": 0.4703703703703703,
+  "defect_recall": 0.9024390243902439,
+  "false_alarm_on_clean": 0.10204081632653061,
+  "route_correct": 0.8888888888888888,
+  "ask_recall": 0.6865079365079364,
+  "detect_unsupported_clause": 0.5333333333333333
+ }
+}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}New request · Legal Agreement AI{% endblock %}
+{% block content %}
+<h1>New agreement request</h1>
+<p class="muted">Fill the form and describe any special terms in your own words. The request text is treated as data: instructions inside it are ignored and flagged.</p>
+<div class="chips">
+  <span class="small muted">Samples:</span>
+  {% for rid, label in samples %}<a href="/requests/new?sample={{ rid }}">{{ label }}</a>{% endfor %}
+</div>
+{% if pre %}<div class="alert info">Loaded synthetic sample <code>{{ pre.request_id }}</code>{% if pre.defects %}: it contains a planted problem ({{ pre.defects | map(attribute='type') | join(', ') }}){% endif %}. Expected route: <code>{{ pre.gold_route }}</code>.</div>{% endif %}
+
+<form method="post" action="/requests" class="grid g2">
+  <div class="card">
+    <div class="field">
+      <label for="agreement_type">Agreement type</label>
+      <select id="agreement_type" name="agreement_type" required>
+        {% for k, v in types.items() %}<option value="{{ k }}" {% if pre and pre.agreement_type == k %}selected{% endif %}>{{ v }} ({{ k }})</option>{% endfor %}
+      </select>
+    </div>
+    {% for t, spec in specs.items() %}
+    <div class="typefields grid g2" data-type="{{ t }}">
+      {% for f in spec %}
+      {% set val = (pre.form.get(f.name) if pre and pre.agreement_type == t else none) %}
+      <div class="field">
+        <label for="{{ t }}__{{ f.name }}">{{ f.label }}{% if f.required %} *{% endif %}</label>
+        {% if f.kind == 'law' %}
+          <select id="{{ t }}__{{ f.name }}" name="{{ t }}__{{ f.name }}">
+            <option value="">(not specified)</option>
+            {% for l in laws %}<option value="{{ l }}" {% if val == l or (not pre and l == 'Singapore') %}selected{% endif %}>{{ l }}</option>{% endfor %}
+          </select>
+        {% elif f.kind == 'date' %}
+          <input type="date" id="{{ t }}__{{ f.name }}" name="{{ t }}__{{ f.name }}" value="{{ val or '' }}">
+        {% elif f.kind == 'number' %}
+          <input type="number" step="any" id="{{ t }}__{{ f.name }}" name="{{ t }}__{{ f.name }}" value="{{ val if val is not none else '' }}">
+          {% if f.range %}<div class="hint">Approved range {{ f.range[0] }} to {{ f.range[1] }}</div>{% endif %}
+        {% else %}
+          <input type="text" maxlength="200" id="{{ t }}__{{ f.name }}" name="{{ t }}__{{ f.name }}" value="{{ val or '' }}">
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+    <p class="small muted">* required by the drafting policy. A missing required field is not blocked here: the system flags it and returns the request, as it would in production.</p>
+  </div>
+  <div class="card">
+    <div class="field">
+      <label for="text">Request to Legal (special terms, context)</label>
+      <textarea id="text" name="text" maxlength="5000" rows="12" placeholder="e.g. They are London-based and insist on English law. They also want to be able to terminate on 30 days' notice.">{{ pre.text if pre else '' }}</textarea>
+      <div class="hint">Emails, phone numbers, NRIC/FIN, UEN and account numbers are masked before storage.</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" type="submit">Submit request</button>
+      <span class="small muted">You are acting as <strong>{{ roles[role] }}</strong>.</span>
+    </div>
+  </div>
+</form>
+{% endblock %}

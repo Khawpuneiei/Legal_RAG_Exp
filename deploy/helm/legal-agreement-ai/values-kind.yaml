@@ -1,0 +1,9 @@
+# Local Kubernetes (kind) verification: in-cluster dev Postgres, no ingress auth, small footprint.
+image: { repository: legal-agreement-ai, tag: local, pullPolicy: Never }
+app: { env: staging, demoMode: true, processing: queue }
+api: { webConcurrency: 1, autoscaling: { enabled: false }, replicas: 1, resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 768Mi } } }
+worker: { autoscaling: { enabled: false }, replicas: 1, resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 768Mi } } }
+embed: { replicas: 1, resources: { requests: { cpu: 200m, memory: 512Mi }, limits: { cpu: "2", memory: 2Gi } } }
+ingress: { enabled: false }
+networkPolicy: { enabled: true, ingressNamespace: ingress-nginx, monitoringNamespace: monitoring }
+devPostgres: { enabled: true }

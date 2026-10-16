@@ -1,28 +1,56 @@
 [project]
 name = "legal-agreement-ai"
-version = "0.1.0"
-description = "Experiment 3 (retrieval pipeline) for the AI legal-agreement drafting prototype"
+version = "1.0.0"
+description = "AI-assisted legal agreement drafting with human review: app, drafting engine and experiments"
 requires-python = ">=3.11,<3.13"
+# Base dependencies = the web app and drafting engine (what Vercel and the container image install).
 dependencies = [
+    "fastapi>=0.115",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "python-docx>=1.1",
+    "requests>=2.32",
+]
+
+[project.optional-dependencies]
+# Experiments 1-3 (local GPU): retrieval models, analysis, LangGraph for the H4 harness.
+experiments = [
     "torch>=2.6",                       # >=2.6 to load .bin checkpoints (CVE-2025-32434); install the CUDA build
     "sentence-transformers>=3.4,<5.0",
     "transformers>=4.51,<4.58",         # 4.51+ for Qwen3-Embedding; 4.57 tested
     "rank-bm25>=0.2.2",
     "numpy>=1.26",
     "pandas>=2.2",
+    "scipy>=1.13",
     "scikit-learn>=1.5",
     "networkx>=3.3",
-    "pyyaml>=6.0",
-    "requests>=2.32",
     "tqdm>=4.66",
     "huggingface-hub>=0.26",
     "tabulate>=0.9",
     "matplotlib>=3.9",
+    "langgraph>=1.0",
 ]
-
-[project.optional-dependencies]
-dev = ["pytest>=8.0"]
+# Kubernetes / Docker runtime: direct Postgres store, queue worker, production server.
+postgres = [
+    "psycopg[binary]>=3.2",
+    "psycopg-pool>=3.2",
+    "gunicorn>=23.0",
+    "uvicorn[standard]>=0.30",
+]
+dev = ["pytest>=8.0", "httpx>=0.27", "ruff>=0.6"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = ["postgres: needs a PostgreSQL database with pgvector (DATABASE_URL)"]
+
+[tool.ruff]
+line-length = 160
+target-version = "py311"
+extend-exclude = ["data", ".cache"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501", "B008", "UP007", "I001", "B905"]

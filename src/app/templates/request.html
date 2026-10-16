@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, route_badge %}
+{% block title %}{{ r.ref }} · Legal Agreement AI{% endblock %}
+{% block head %}{% if r.status == "QUEUED" %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+{% block content %}
+<div class="btn-row">
+  <h1>{{ r.ref }}</h1> {{ status_badge(r.status) }} {{ route_badge(r.route) }}
+</div>
+<p class="muted">{{ r.agreement_type }} with <strong>{{ r.form.get('counterparty_name') or 'unknown counterparty' }}</strong>, submitted by {{ r.requester }} at {{ r.created_at[:19] | replace('T', ' ') }} UTC.</p>
+{% if r.status == 'QUEUED' %}<div class="alert info">Drafting in progress: a worker is preparing this draft. The page refreshes every 5 seconds.</div>{% endif %}
+{% if request.query_params.get('error') %}<div class="alert bad">{{ request.query_params.get('error') }}</div>{% endif %}
+
+<div class="grid g2">
+  <div class="card">
+    <h2>Issues found</h2>
+    {% for i in d.issues or [] %}
+      <div class="issue {{ 'semantic' if i.type in ('unsupported_clause', 'prompt_injection') else '' }}">
+        <strong>{{ i.type | replace('_', ' ') }}</strong>{% if i.field %} · <code>{{ i.field }}</code>{% endif %}<br><span class="small">{{ i.detail }}</span>
+        <span class="small muted"> ({{ i.source or 'rules' }})</span>
+      </div>
+    {% else %}
+      <div class="alert ok">No problems found. The draft goes to standard Legal review.</div>
+    {% endfor %}
+    {% if d.evidence and d.evidence.material_deviations %}
+      <div class="issue semantic"><strong>material deviation</strong><br><span class="small">Selected fallback clauses with deviation cost at or above the policy threshold: {% for k, v in d.evidence.material_deviations.items() %}<code>{{ k }}</code> ({{ v }}) {% endfor %}</span></div>
+    {% endif %}
+    <h3>Reviewer note</h3>
+    <p>{{ d.reviewer_note or '–' }}</p>
+  </div>
+
+  <div class="card">
+    <h2>Legal review</h2>
+    {% if r.status in ('IN_REVIEW', 'ESCALATED') %}
+      {% if role == 'requester' %}
+        <p class="muted">Switch the role selector (top right) to <strong>Legal reviewer</strong> or <strong>Senior Legal / Compliance</strong> to review this draft.{% if r.status == 'ESCALATED' %} Escalated drafts can only be approved by Senior Legal / Compliance.{% endif %}</p>
+      {% else %}
+        <form method="post" action="/requests/{{ r.id }}/review" data-confirm="Approve this draft? Approval is recorded in the audit trail.">
+          <div class="field">
+            <label for="decision">Decision</label>
+            <select id="decision" name="decision">
+              <option value="approve">Approve</option>
+              <option value="request_changes">Request changes (return to requester)</option>
+              <option value="escalate">Escalate to Senior Legal / Compliance</option>
+              <option value="reject">Reject</option>
+            </select>
+          </div>
+          <div class="field"><label for="comment">Comment</label><textarea id="comment" name="comment" maxlength="2000" rows="3"></textarea></div>
+          <button class="btn" type="submit">Record decision as {{ roles[role] }}</button>
+        </form>
+      {% endif %}
+    {% elif r.status == 'RETURNED' %}
+      <p>The request was returned to the requester to fix the issues listed. <a href="/requests/new">Submit a corrected request</a>.</p>
+    {% else %}
+      <p>Final status: {{ status_badge(r.status) }}</p>
+    {% endif %}
+    {% for v in data.reviews %}
+      <p class="small"><strong>{{ v.reviewer }}</strong> ({{ v.reviewer_role | replace('_', ' ') }}) chose <code>{{ v.decision }}</code>{% if v.comment %}: “{{ v.comment }}”{% endif %}</p>
+    {% endfor %}
+    <div class="btn-row"><a class="btn secondary small" href="/requests/{{ r.id }}/draft.docx">Download draft (.docx)</a> <a class="btn secondary small" href="/api/v1/requests/{{ r.id }}">JSON</a></div>
+  </div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h2>Fields</h2>
+    <dl class="kv">
+      {% for k in required %}
+        <dt>{{ k | replace('_', ' ') }}</dt>
+        <dd>{% set v = (d.fields or {}).get(k) %}{% if v is none %}<span class="badge b-bad">missing</span>{% else %}{{ v }}{% endif %}{% if r.form.get(k) is not none and r.form.get(k) != v %} <span class="small muted">(form: {{ r.form.get(k) }})</span>{% endif %}</dd>
+      {% endfor %}
+    </dl>
+    <h3>Request text (PII masked)</h3>
+    <div class="req-text">{{ r.text_masked }}</div>
+    {% if r.pii_findings %}<p class="small muted">Masked: {% for k, v in r.pii_findings.items() %}{{ k }} × {{ v }} {% endfor %}</p>{% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Special requests → approved clauses</h2>
+    {% for s in d.selections or [] %}
+      {% set c = clause_view(s.clause_id) if s.clause_id else none %}
+      <div class="clause {{ 'sel' if c else '' }}">
+        <h4>“{{ s.requirement }}”</h4>
+        {% if c %}<p>→ <code>{{ c.clause_id }}</code> {{ c.title }} <span class="small muted">({{ c.variant }}{% if c.deviation_cost %}, deviation {{ c.deviation_cost }}{% endif %})</span></p>
+        {% else %}<p>→ <span class="badge b-warn">no approved clause</span> flagged for Legal</p>{% endif %}
+      </div>
+    {% else %}
+      <p class="muted">No special requests: the standard template applies.</p>
+    {% endfor %}
+    {% if d.evidence and d.evidence.requirements %}
+    <details><summary>Retrieval evidence (top candidates per request, A* assignment)</summary>
+      {% for q in d.evidence.requirements %}
+        <p class="small"><strong>{{ q.requirement }}</strong></p>
+        <table><tbody>{% for c in q.candidates %}<tr class="{{ 'best' if c.clause_id == q.chosen else '' }}"><td><code>{{ c.clause_id }}</code></td><td>{{ c.title }}</td><td class="num">{{ '%.2f' % c.relevance }}</td></tr>{% endfor %}</tbody></table>
+      {% endfor %}
+      <p class="small muted">A* expanded {{ d.evidence.nodes_expanded }} nodes. Relevance is the calibrated retrieval score; a request is left unmatched when no candidate beats the abstention cost tuned on the dev split.</p>
+    </details>
+    {% endif %}
+    {% if d.evidence and d.evidence.dependencies_added %}
+      <p class="small">Added because the chosen clauses depend on them (clause graph): {% for c in d.evidence.dependencies_added %}<code>{{ c }}</code> {% endfor %}</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Draft preview</h2>
+  <p class="small muted">Assembled from the approved template and clause library. Highlighted: chosen for a special request. Dashed: added by the clause graph (definitions, legal requirements). Configuration: <code>{{ d.mode }}</code>, search <code>{{ (d.config or {}).get('search_backend') }}</code>, code <code>{{ (d.config or {}).get('code') }}</code>.</p>
+  <details><summary>Show {{ preview | length }} clauses</summary>
+  {% for c in preview %}
+    <div class="clause {{ 'sel' if c.selected else ('dep' if c.added else '') }}">
+      <h4>{{ c.title }} <span class="small muted"><code>{{ c.clause_id }}</code> {{ c.version }}</span></h4>
+      <p>{{ c.text }}</p>
+    </div>
+  {% endfor %}
+  </details>
+</div>
+
+<div class="card">
+  <h2>Audit trail</h2>
+  <ul class="timeline">
+    {% for e in data.audit %}
+      <li><strong>{{ e.event | replace('_', ' ') }}</strong> by {{ e.actor }} <span class="small muted">({{ e.actor_role }}) {{ e.at[:19] | replace('T', ' ') }}</span><div class="hash">{{ e.hash }}</div></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

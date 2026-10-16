@@ -1,0 +1,9 @@
+{% macro status_badge(s) -%}
+{%- set cls = {'APPROVED': 'b-ok', 'IN_REVIEW': 'b-info', 'ESCALATED': 'b-warn', 'RETURNED': 'b-warn', 'REJECTED': 'b-bad', 'QUEUED': 'b-mute', 'FAILED': 'b-bad'} -%}
+<span class="badge {{ cls.get(s, 'b-mute') }}">{{ s | replace('_', ' ') | lower }}</span>
+{%- endmacro %}
+{% macro route_badge(r) -%}
+{%- set cls = {'standard_review': 'b-info', 'escalate': 'b-warn', 'return_to_requester': 'b-bad'} -%}
+{%- set label = {'standard_review': 'Legal review', 'escalate': 'Senior Legal / Compliance', 'return_to_requester': 'Returned to requester'} -%}
+{% if r %}<span class="badge {{ cls.get(r, 'b-mute') }}">{{ label.get(r, r) }}</span>{% else %}<span class="badge b-mute">pending</span>{% endif %}
+{%- endmacro %}

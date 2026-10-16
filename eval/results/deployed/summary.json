@@ -1,0 +1,79 @@
+{
+ "config": {
+  "search": "supabase-hybrid-gte-small",
+  "mode": "rules",
+  "lo": 0.78,
+  "hi": 0.9,
+  "tau": 1.0
+ },
+ "retrieval nDCG@10 (whole request)": {
+  "mean": 0.27580812283936645,
+  "ci_low": 0.21940696404211868,
+  "ci_high": 0.33644184867368904
+ },
+ "retrieval Recall@5 (whole request)": {
+  "mean": 0.2976190476190476,
+  "ci_low": 0.22123015873015875,
+  "ci_high": 0.375
+ },
+ "success": {
+  "mean": 0.35555555555555557,
+  "ci_low": 0.25555555555555554,
+  "ci_high": 0.4666666666666667,
+  "n": 90
+ },
+ "success_core": {
+  "mean": 0.35555555555555557,
+  "ci_low": 0.25555555555555554,
+  "ci_high": 0.4666666666666667,
+  "n": 90
+ },
+ "defect_recall": {
+  "mean": 0.7926829268292683,
+  "ci_low": 0.6829268292682927,
+  "ci_high": 0.9024390243902439,
+  "n": 41
+ },
+ "false_alarm_on_clean": {
+  "mean": 0.0,
+  "ci_low": 0.0,
+  "ci_high": 0.0,
+  "n": 49
+ },
+ "route_correct": {
+  "mean": 0.8666666666666667,
+  "ci_low": 0.7888888888888889,
+  "ci_high": 0.9333333333333333,
+  "n": 90
+ },
+ "field_accuracy": {
+  "mean": 1.0,
+  "ci_low": 1.0,
+  "ci_high": 1.0,
+  "n": 90
+ },
+ "ask_recall": {
+  "mean": 0.5873015873015872,
+  "ci_low": 0.5098710317460318,
+  "ci_high": 0.6686507936507935,
+  "n": 84
+ },
+ "citation_accuracy": {
+  "mean": 0.5201851851851852,
+  "ci_low": 0.4433333333333333,
+  "ci_high": 0.6013009259259259,
+  "n": 90
+ },
+ "hallucinated_clause_rate": {
+  "mean": 0.0,
+  "ci_low": 0.0,
+  "ci_high": 0.0,
+  "n": 90
+ },
+ "detect_unsupported_clause": {
+  "mean": 0.0,
+  "ci_low": 0.0,
+  "ci_high": 0.0,
+  "n": 10
+ }
+}

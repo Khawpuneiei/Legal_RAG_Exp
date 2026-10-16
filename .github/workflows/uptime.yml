@@ -1,0 +1,24 @@
+name: uptime
+# Daily synthetic check of the live demo. It also keeps the free Supabase project active: free projects pause after
+# 7 days without activity, and /readyz plus a clause search touch both Postgres and the Edge Function.
+on:
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Health, readiness, search, audit chain
+        run: |
+          set -e
+          B=https://legal-agreement-ai.vercel.app
+          curl -fsS "$B/healthz"
+          curl -fsS "$B/readyz"
+          curl -fsS -X POST "$B/api/v1/search" -H 'content-type: application/json' -d '{"query":"English law governs the agreement","agreement_type":"NDA","k":3}' | grep -q BP-GOVLAW
+          curl -fsS "$B/api/v1/audit/verify" | grep -q '"intact":true'

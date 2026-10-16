@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 780" font-family="Segoe UI, Arial, sans-serif" font-size="13">
+  <title>Legal Agreement AI: production architecture</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6676"/></marker>
+  </defs>
+  <rect width="1200" height="780" fill="#ffffff"/>
+  <text x="24" y="32" font-size="18" fill="#1b2430" font-weight="600">Legal Agreement AI — production architecture (Azure, Singapore region)</text>
+  <text x="24" y="52" fill="#4b5563" font-size="11.5">Grey: deterministic code · Blue: model-assisted · Orange: human checkpoint · Green: system of record. Same image, migrations and drafting engine as the free demo. Private endpoints, encryption at rest.</text>
+
+  <!-- users -->
+  <rect x="24" y="76" width="250" height="92" fill="#fff3d6" stroke="#b07a00" stroke-width="1.2" rx="8"/>
+  <text x="38" y="98" fill="#1b2430" font-weight="600">People</text>
+  <text x="38" y="118" fill="#4b5563" font-size="11.5">Staff requester · Legal reviewer</text>
+  <text x="38" y="135" fill="#4b5563" font-size="11.5">Senior Legal / Compliance (escalations)</text>
+  <text x="38" y="152" fill="#4b5563" font-size="11.5">Browser or Teams tab</text>
+
+  <rect x="320" y="76" width="250" height="92" fill="#f3f5f8" stroke="#7d8898" stroke-width="1.2" rx="8"/>
+  <text x="334" y="98" fill="#1b2430" font-weight="600">Edge</text>
+  <text x="334" y="118" fill="#4b5563" font-size="11.5">Entra ID OIDC (oauth2-proxy), RBAC groups</text>
+  <text x="334" y="135" fill="#4b5563" font-size="11.5">NGINX ingress, TLS, WAF, body-size limit</text>
+  <text x="334" y="152" fill="#4b5563" font-size="11.5">Private DNS, no public DB endpoints</text>
+  <path d="M274 122 H316" stroke="#5b6676" stroke-width="1.3" fill="none" marker-end="url(#a)"/>
+
+  <!-- cluster -->
+  <rect x="24" y="190" width="760" height="360" fill="none" stroke="#b8c1cc" stroke-dasharray="6 4" rx="12"/>
+  <text x="38" y="212" fill="#5b6676" font-size="12" font-weight="600" letter-spacing="0.5">AKS CLUSTER · legal-ai</text>
+
+  <rect x="44" y="226" width="230" height="132" fill="#f3f5f8" stroke="#7d8898" stroke-width="1.2" rx="8"/>
+  <text x="58" y="248" fill="#1b2430" font-weight="600">API (FastAPI)</text>
+  <text x="58" y="268" fill="#4b5563" font-size="11.5">gunicorn + uvicorn, HPA 2–10, PDB</text>
+  <text x="58" y="285" fill="#4b5563" font-size="11.5">schema validation, PII guard</text>
+  <text x="58" y="302" fill="#4b5563" font-size="11.5">template router, field populator</text>
+  <text x="58" y="319" fill="#4b5563" font-size="11.5">enqueue job → 202, review API</text>
+  <text x="58" y="336" fill="#4b5563" font-size="11.5">probes /healthz /readyz</text>
+  <path d="M445 168 V186 H230 V222" stroke="#5b6676" stroke-width="1.3" fill="none" marker-end="url(#a)"/>
+
+  <rect x="300" y="226" width="236" height="132" fill="#e6eef7" stroke="#1f4e79" stroke-width="1.2" rx="8"/>
+  <text x="314" y="248" fill="#1b2430" font-weight="600">Drafting workers</text>
+  <text x="314" y="268" fill="#4b5563" font-size="11.5">claim jobs (SKIP LOCKED), HPA 1–8</text>
+  <text x="314" y="285" fill="#4b5563" font-size="11.5">rules / assist / agent mode</text>
+  <text x="314" y="302" fill="#4b5563" font-size="11.5">A* clause assembly, Validation Engine,</text>
+  <text x="314" y="319" fill="#4b5563" font-size="11.5">routing policy (LLM may only escalate)</text>
+  <text x="314" y="336" fill="#4b5563" font-size="11.5">graceful drain on SIGTERM</text>
+
+  <rect x="562" y="226" width="200" height="132" fill="#f3f5f8" stroke="#7d8898" stroke-width="1.2" rx="8"/>
+  <text x="576" y="248" fill="#1b2430" font-weight="600">Embeddings (TEI)</text>
+  <text x="576" y="268" fill="#4b5563" font-size="11.5">gte-small, 2 replicas</text>
+  <text x="576" y="285" fill="#4b5563" font-size="11.5">query + clause vectors</text>
+  <text x="576" y="302" fill="#4b5563" font-size="11.5">(GPU option: bge-m3 +</text>
+  <text x="576" y="319" fill="#4b5563" font-size="11.5">bge-reranker-v2-m3, the</text>
+  <text x="576" y="336" fill="#4b5563" font-size="11.5">Exp 3 winner)</text>
+  <path d="M536 292 H558" stroke="#5b6676" stroke-width="1.3" fill="none" marker-end="url(#a)"/>
+
+  <rect x="44" y="380" width="230" height="74" fill="#f3f5f8" stroke="#7d8898" stroke-width="1.2" rx="8"/>
+  <text x="58" y="402" fill="#1b2430" font-weight="600">Migration Job (Helm hook)</text>
+  <text x="58" y="421" fill="#4b5563" font-size="11.5">ordered, idempotent, advisory lock</text>
+  <text x="58" y="438" fill="#4b5563" font-size="11.5">before every install / upgrade</text>
+
+  <rect x="300" y="380" width="236" height="74" fill="#f3f5f8" stroke="#7d8898" stroke-width="1.2" rx="8"/>
+  <text x="314" y="402" fill="#1b2430" font-weight="600">Library sync CronJob</text>
+  <text x="314" y="421" fill="#4b5563" font-size="11.5">approved clauses → Postgres + vectors</text>
+  <text x="314" y="438" fill="#4b5563" font-size="11.5">hourly + after each release</text>
+
+  <rect x="562" y="380" width="200" height="74" fill="#f3f5f8" stroke="#7d8898" stroke-width="1.2" rx="8"/>
+  <text x="576" y="402" fill="#1b2430" font-weight="600">Observability agents</text>
+  <text x="576" y="421" fill="#4b5563" font-size="11.5">OpenTelemetry, JSON logs</text>
+  <text x="576" y="438" fill="#4b5563" font-size="11.5">request id on every event</text>
+
+  <rect x="44" y="468" width="718" height="76" fill="#fff3d6" stroke="#b07a00" stroke-width="1.2" rx="8"/>
+  <text x="58" y="489" fill="#1b2430" font-weight="600">Human review is a database state, not a running process</text>
+  <text x="58" y="510" fill="#4b5563" font-size="11.5">Drafts wait in IN_REVIEW / ESCALATED for hours or days. Approve, reject, request changes and escalate all go through api_review(),</text><text x="58" y="525" fill="#4b5563" font-size="11.5">which enforces who may approve (escalated drafts: Senior Legal only) and writes the decision to the audit chain in the same</text><text x="58" y="540" fill="#4b5563" font-size="11.5">transaction. Nothing is sent for signature before APPROVED.</text>
+
+  <!-- AI services -->
+  <rect x="812" y="76" width="364" height="92" fill="none" stroke="#b8c1cc" stroke-dasharray="6 4" rx="12"/>
+  <text x="826" y="98" fill="#5b6676" font-size="12" font-weight="600" letter-spacing="0.5">MODEL SERVICES</text>
+  <rect x="826" y="108" width="160" height="50" fill="#e6eef7" stroke="#1f4e79" stroke-width="1.2" rx="8"/>
+  <text x="838" y="128" fill="#1b2430" font-weight="600">LiteLLM gateway</text>
+  <text x="838" y="146" fill="#4b5563" font-size="11.5">keys, limits, cost, fallback</text>
+  <rect x="1000" y="108" width="164" height="50" fill="#e6eef7" stroke="#1f4e79" stroke-width="1.2" rx="8"/>
+  <text x="1012" y="128" fill="#1b2430" font-weight="600">LLM backends</text>
+  <text x="1012" y="146" fill="#4b5563" font-size="11.5">Azure OpenAI APAC · vLLM</text>
+  <path d="M986 133 H996" stroke="#5b6676" stroke-width="1.3" fill="none" marker-end="url(#a)"/>
+  <path d="M536 236 H549 V180 H800 V140 H822" stroke="#5b6676" stroke-width="1.3" fill="none" marker-end="url(#a)"/>
+
+  <rect x="812" y="190" width="364" height="168" fill="#f3f5f8" stroke="#7d8898" stroke-width="1.2" rx="8"/>
+  <text x="826" y="212" fill="#1b2430" font-weight="600">Tracing, metrics, alerts</text>
+  <text x="826" y="232" fill="#4b5563" font-size="11.5">Langfuse (self-hosted): every LLM call, prompt hash, tokens</text>
+  <text x="826" y="249" fill="#4b5563" font-size="11.5">Prometheus + Grafana: latency, queue depth, route mix,</text>
+  <text x="826" y="266" fill="#4b5563" font-size="11.5">escalation rate, rule-vs-LLM disagreement, cost</text>
+  <text x="826" y="283" fill="#4b5563" font-size="11.5">Alerts: queue age &gt; 5 min, error rate, audit chain broken,</text>
+  <text x="826" y="300" fill="#4b5563" font-size="11.5">weekly scoreboard regression (deployed-eval workflow)</text>
+  <text x="826" y="317" fill="#4b5563" font-size="11.5">Log Analytics: 1-year retention for audit queries</text>
+  <path d="M762 418 C790 400 800 330 808 310" stroke="#5b6676" stroke-width="1.2" fill="none" stroke-dasharray="4 3" marker-end="url(#a)"/>
+
+  <!-- data tier -->
+  <rect x="24" y="572" width="760" height="190" fill="none" stroke="#b8c1cc" stroke-dasharray="6 4" rx="12"/>
+  <text x="38" y="594" fill="#5b6676" font-size="12" font-weight="600" letter-spacing="0.5">DATA TIER</text>
+  <rect x="44" y="606" width="410" height="140" fill="#e8f4ec" stroke="#2f7a4a" stroke-width="1.2" rx="8"/>
+  <text x="58" y="628" fill="#1b2430" font-weight="600">Azure Database for PostgreSQL (Flexible, zone-redundant HA)</text>
+  <text x="58" y="648" fill="#4b5563" font-size="11.5">requests · drafts (config + versions) · reviews · jobs queue</text>
+  <text x="58" y="665" fill="#4b5563" font-size="11.5">audit_events: append-only, sha256 hash chain (api_verify_audit)</text>
+  <text x="58" y="682" fill="#4b5563" font-size="11.5">clauses + pgvector HNSW + tsvector: hybrid_search() with RRF</text>
+  <text x="58" y="699" fill="#4b5563" font-size="11.5">roles: app_login → api_*, worker_login → worker_*, owner → migrations</text>
+  <text x="58" y="716" fill="#4b5563" font-size="11.5">PITR 35 days, geo-redundant backups, PgBouncer (built-in)</text>
+  <text x="58" y="733" fill="#4b5563" font-size="11.5">RLS on every table: no direct table access for app roles</text>
+  
+  
+  
+
+  <path d="M250 548 V602" stroke="#5b6676" stroke-width="1.3" fill="none" marker-end="url(#a)"/><text x="258" y="566" fill="#4b5563" font-size="11.5">pods call SQL functions only (api_*, worker_*)</text><rect x="474" y="606" width="290" height="64" fill="#e8f4ec" stroke="#2f7a4a" stroke-width="1.2" rx="8"/>
+  <text x="488" y="628" fill="#1b2430" font-weight="600">Blob storage (immutable / WORM)</text>
+  <text x="488" y="648" fill="#4b5563" font-size="11.5">nightly audit-chain export, rendered drafts</text>
+  <rect x="474" y="682" width="290" height="64" fill="#e8f4ec" stroke="#2f7a4a" stroke-width="1.2" rx="8"/>
+  <text x="488" y="704" fill="#1b2430" font-weight="600">Key Vault</text>
+  <text x="488" y="724" fill="#4b5563" font-size="11.5">DB URLs, LLM keys → External Secrets → pods</text>
+
+  <!-- integrations + delivery -->
+  <rect x="812" y="380" width="364" height="154" fill="#f3f5f8" stroke="#7d8898" stroke-width="1.2" rx="8"/>
+  <text x="826" y="402" fill="#1b2430" font-weight="600">Integrations (Microsoft 365)</text>
+  <text x="826" y="422" fill="#4b5563" font-size="11.5">SharePoint (Graph, Sites.Selected): source of the approved</text>
+  <text x="826" y="439" fill="#4b5563" font-size="11.5">template and clause library; approved drafts filed back</text>
+  <text x="826" y="456" fill="#4b5563" font-size="11.5">DocuSign eSignature: envelope only after APPROVED</text>
+  <text x="826" y="473" fill="#4b5563" font-size="11.5">KnowYourCustomer / registers: reuse of the same</text>
+  <text x="826" y="490" fill="#4b5563" font-size="11.5">workflow engine for other Compliance processes</text>
+  <text x="826" y="507" fill="#4b5563" font-size="11.5">All calls from workers, idempotent, with retries</text>
+  <path d="M812 520 H792 V462 H418 V458" stroke="#5b6676" stroke-width="1.2" fill="none" stroke-dasharray="4 3" marker-end="url(#a)"/>
+
+  <rect x="812" y="572" width="364" height="190" fill="#f3f5f8" stroke="#7d8898" stroke-width="1.2" rx="8"/>
+  <text x="826" y="594" fill="#1b2430" font-weight="600">Delivery and governance</text>
+  <text x="826" y="614" fill="#4b5563" font-size="11.5">GitHub Actions: lint, tests, SQL integration tests,</text>
+  <text x="826" y="631" fill="#4b5563" font-size="11.5">deterministic release gate, image build, Helm validation</text>
+  <text x="826" y="648" fill="#4b5563" font-size="11.5">Image → GHCR / ACR (signed, SBOM) → Helm via Argo CD</text>
+  <text x="826" y="665" fill="#4b5563" font-size="11.5">Terraform: AKS, Postgres, Key Vault, Blob, VNet, DNS</text>
+  <text x="826" y="682" fill="#4b5563" font-size="11.5">Staging → production promotion with change approval</text>
+  <text x="826" y="699" fill="#4b5563" font-size="11.5">Model / prompt / policy change = new scoreboard run and</text>
+  <text x="826" y="716" fill="#4b5563" font-size="11.5">independent review before release (MAS AI RM 5.18)</text>
+  <text x="826" y="733" fill="#4b5563" font-size="11.5">AI inventory entry + model card kept in docs/governance.md</text>
+</svg>

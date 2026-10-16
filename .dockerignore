@@ -1,0 +1,13 @@
+.venv
+.cache
+.git
+.vercel
+**/__pycache__
+.pytest_cache
+data/public
+eval/results/**/per_item.jsonl
+eval/results/**/per_query.jsonl
+eval/results/**/rankings.jsonl
+eval/results/**/*per_item.jsonl
+deploy/terraform
+notebooks

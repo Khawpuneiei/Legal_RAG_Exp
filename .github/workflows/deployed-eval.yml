@@ -1,0 +1,30 @@
+name: deployed-eval
+# Re-score the live free-tier configuration (Supabase hybrid search + rules mode) on the frozen test split.
+# Manual, plus weekly, so drift in the hosted embedding model or the library shows up in eval/results/deployed.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv venv && uv pip install -r pyproject.toml --extra dev numpy scipy
+      - run: uv run python eval/deployed_eval.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deployed-eval
+          path: eval/results/deployed/
+      - name: Smoke-test production
+        run: |
+          curl -fs https://legal-agreement-ai.vercel.app/healthz
+          curl -fs https://legal-agreement-ai.vercel.app/readyz

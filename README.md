@@ -1,8 +1,9 @@
-# Legal Agreement AI — Research README
+# Legal Agreement AI
 
 **Project:** AI-assisted legal agreement generation and workflow automation for a MAS-regulated fund manager (Singapore).
-**Companion document:** [docs/project-plan.md](docs/project-plan.md) (the group-assignment plan: experiments, datasets, timeline, team roles).
-**Status:** research notes, 16 October 2026. **Experiment 3 (retrieval pipeline) is now implemented and has been run locally**: see [Running Experiment 3](#running-experiment-3-locally) and [docs/experiment3-results.md](docs/experiment3-results.md). Experiments 1 and 2 (skill files, agent harness) are not implemented yet.
+**Live demo:** https://legal-agreement-ai.vercel.app (free tier, synthetic data, rules mode) · [presenter script](docs/demo-script.md)
+**Architecture:** [docs/architecture.md](docs/architecture.md) · **Deployment:** [docs/deployment.md](docs/deployment.md) · **Governance:** [docs/governance.md](docs/governance.md) · **Plan:** [docs/project-plan.md](docs/project-plan.md)
+**Status (17 October 2026):** Experiments 2 and 3 are run on the frozen test split. Experiment 1 is implemented and piloted on the dev split; its full run is deferred. The application is deployed on a free tier (Vercel + Supabase, Singapore region), and the production kit (container image, Docker Compose, Helm chart, Terraform for Azure, CI) is in the repository and validated.
 
 This README answers two research questions that the project plan left open:
 
@@ -15,17 +16,44 @@ Every claim that came from a web source is linked. Claims first seen only in sec
 
 ## Results by research question
 
-The project has five research questions: RQ1–RQ3 from the [project plan](docs/project-plan.md#3-objectives-and-research-questions) and the two this README adds. Only Experiment 3 has been run, so only some of them have measured answers so far.
+The project has five research questions: RQ1–RQ3 from the [project plan](docs/project-plan.md#3-objectives-and-research-questions) and the two this README adds.
 
 | Research question | Status | Evidence | Short answer |
 |---|---|---|---|
-| **RQ1** (plan): does a `SKILL.md` playbook improve drafting over a vanilla LLM? | Not run yet | Experiment 1 (planned) | – |
-| **RQ2** (plan): does an agent harness outperform a single LLM call? | Not run yet | Experiment 2 (planned) | – |
+| **RQ1** (plan): does a `SKILL.md` playbook improve drafting over a vanilla LLM? | Implemented, dev pilot only | Experiment 1, [method](docs/experiment12-method.md) | Full run deferred, below |
+| **RQ2** (plan): does an agent harness outperform a single LLM call? | **Answered** | Experiment 2: 7 harnesses × 90 requests × 3 seeds | **No** with a local 7B model; rules-first decomposition wins, below |
 | **RQ3** (plan): does a stronger retrieval pipeline improve accuracy and grounding? | **Answered** | Experiment 3: three benchmarks and a grounding eval | **Yes**, below |
 | **Q2** (README): does A\*-guided clause-graph retrieval help? | **Partly answered** | Experiment 3, conditions R6a–R6d | **Yes for self-contained evidence; no against plain BFS**, below |
-| **Q1** (README): which production stack? | Design question, no benchmark | Part 1; Experiment 3 sets the retrieval configuration | See Part 1 |
+| **Q1** (README): which production stack? | **Answered by building it** | [docs/architecture.md](docs/architecture.md), the live deployment, measured in `eval/results/deployed/` | Below |
 
-All numbers come from [docs/experiment3-results.md](docs/experiment3-results.md), with paired significance tests in [`eval/results/exp3/significance.md`](eval/results/exp3/significance.md). "Significant" means the 95% paired bootstrap CI of the difference excludes zero.
+"Significant" means the 95% paired bootstrap CI of the difference excludes zero.
+
+### RQ2 — Does an agent harness outperform a single LLM call?
+
+**Answer: no, not with a local 7B model (qwen2.5:7b).** The rules-only pipeline beats every LLM harness on task success and routing; the plain tool-using agent is the worst condition. Full write-up: [docs/experiment2-results.md](docs/experiment2-results.md).
+
+| Condition | Success | Route correct | Defect recall | False alarm on clean requests | LLM calls | Tokens per request |
+|---|---|---|---|---|---|---|
+| H-det: rules + A\* clause assembly, no LLM | **0.444** | **0.889** | 0.793 | **0.000** | 0 | 0 |
+| H0: single LLM call | 0.233 | 0.504 | 0.736 | 0.973 | 1 | 4,287 |
+| H1: fixed pipeline | 0.289 | 0.526 | 0.650 | 1.000 | 2 | 4,530 |
+| H2: ReAct agent with tools | 0.126 | 0.493 | 0.829 | 0.537 | 6.9 | 33,365 |
+| H3: H2 + validation/reflection loop | 0.241 | 0.752 | 0.927 | 0.238 | 8.3 | 42,322 |
+| H4: H3 + checker and router agents + human-review interrupt | 0.152 | 0.548 | **0.943** | 0.347 | 10.3 | 46,081 |
+| H3b: LLM extracts requests, A\* assembles, rules check | 0.352 | 0.807 | 0.902 | 0.102 | 1 | 291 |
+
+<p>
+  <img src="eval/results/exp2/figures/scoreboard.png" alt="Experiment 2: success, defect recall, field accuracy, ask recall and route accuracy for H-det, H0, H1, H2, H3, H4 and H3b" width="100%">
+</p>
+
+- **Deterministic decomposition wins.** H-det doubles the single call's success (+0.21, McNemar p = 0.003) and routes 89% of requests correctly with no false alarms. Its rule-based request segmentation was written against the synthetic phrasing, so it is optimistic on this data.
+- **The 7B model over-flags.** Free-form LLM issue lists flag a defect on 97–100% of clean requests, for example reporting the approved English-law fallback as a governing-law problem. The production design therefore lets the rules own structural checks.
+- **The LLM's value is semantic.** It catches asks that no approved clause covers (93–100%, rules 0%) and matches requests to clauses better (ask recall 0.79 vs 0.69).
+- **The validation loop is the agent component worth keeping** (H3 vs H2: success 0.13 → 0.24, routing 0.49 → 0.75, false alarms 0.54 → 0.24). **More agents made it worse** (H4: success 0.15; the router agent over-escalates).
+- **Cost:** agents use 8–11× the tokens of a single call. H3b gets 12 successes per 10,000 tokens; the agents get 0.03–0.06.
+- An exploratory, post-hoc combination (rules plus H3b's "no approved clause" flags) reached 0.47 success; it was designed after seeing these results, so it is a hypothesis for the next test set ([details](docs/experiment2-results.md#exploratory-post-hoc-rules-plus-the-llms-semantic-flags)).
+
+**What it changes:** the default drafting mode is `rules` (what the demo runs), the recommended LLM mode is `assist` (H3b: one call), and `agent` mode is not recommended with a small local model. An LLM may add semantic issues and escalate, never downgrade a route (ADR-2 in [docs/architecture.md](docs/architecture.md)).
 
 ### RQ3 — Does a stronger retrieval pipeline improve accuracy and grounding?
 
@@ -75,13 +103,69 @@ All numbers come from [docs/experiment3-results.md](docs/experiment3-results.md)
 - The pre-registered hypothesis "A\* beats BFS on definition coverage and cross-reference completeness" is **rejected**. BFS scores higher on both, but it finds about a fifth fewer of the requested clauses (0.508 vs 0.644) and satisfies fewer legal requirements (0.690 vs 0.950).
 - The heuristic tuned on dev is inadmissible and better (+0.11 cross-reference completeness, significant). This matches the Distance-Indexed Neural A\* paper (section 2.2).
 
-### README Q1 — Production stack
+### RQ1 — Does a SKILL.md playbook beat a vanilla LLM? (not run on the test split yet)
 
-There is no benchmark for this question. It is answered by design in [Part 1](#part-1--production-tech-stack-end-to-end). Experiment 3 changes one decision: the release-gate retrieval configuration becomes **R5 + R6d** (hybrid search, reranker, contextual chunks, then A\* graph expansion) instead of R4 (section 1.5).
+Experiment 1 is fully implemented: a `SKILL.md` skill in the Anthropic Agent Skills layout ([skills/legal-agreement-drafting](skills/legal-agreement-drafting/)), seven conditions (S0 vanilla, S1 long system prompt, S2 focused skill that the model loads file by file, S3 comprehensive skill, S4 skill written by the model itself, S5 S2 on qwen2.5:3b, S0s S0 on qwen2.5:3b) and the checklist-compliance and format metrics ([method](docs/experiment12-method.md)). A 4-request pilot on the dev split ran end to end. The full test-split run (about 4 GPU hours on the reference laptop), the Experiment 3 graph-evidence drafting addendum and the LLM judge of reviewer notes were deferred on 17 October 2026. To run them:
 
-### RQ1 and RQ2 — not run yet
+```bash
+OLLAMA_HOST=http://127.0.0.1:11435 RERANK_BATCH=8 .venv/Scripts/python.exe eval/exp12.py --exp 1 --workers 4
+```
+```bash
+.venv/Scripts/python.exe eval/generation_eval_graph.py
+```
+```bash
+.venv/Scripts/python.exe eval/judge.py
+```
 
-Experiments 1 (skill files, conditions S0–S5) and 2 (agent harness, conditions H0–H4) are designed in the [project plan](docs/project-plan.md#5-experiment-design) but not implemented. They would reuse the same synthetic requests, which already exist, and the same Scoreboard metrics. The plan's planted-defect labels (missing fields, conflicting dates, fee out of range and others) still need to be added to `data/synthetic/requests.jsonl` before Experiment 2 can measure defect recall.
+The first command expects the parallel Ollama server described in `scripts/run_all_experiments.sh`; the test set, skill files and caches are already in place.
+
+### Q1 — Production stack
+
+Answered by building and deploying it. The final architecture, with eight decision records and the evidence behind them, is [docs/architecture.md](docs/architecture.md). It supersedes Part 1 below where they differ: the workflow state machine and audit trail live in Postgres functions rather than a LangGraph Agent Server; the job queue is Postgres rather than Redis or Temporal; clause vectors live in the system-of-record Postgres (pgvector) rather than Qdrant; and drafting is rules-first because of Experiment 2.
+
+| Deployment | What runs | Status |
+|---|---|---|
+| Free demo | FastAPI on Vercel (`sin1`) + Supabase Postgres 17 and an Edge Function with gte-small hybrid search (`ap-southeast-1`) | **Live**: https://legal-agreement-ai.vercel.app |
+| Single machine | `deploy/docker-compose.yml`: Postgres + pgvector, TEI embeddings, API, queue workers, optional Ollama | Image built and smoke-tested in CI |
+| Production | Helm chart (`deploy/helm`) on AKS, Terraform for Azure (`deploy/terraform/azure`): private Postgres with pgvector, Key Vault, WORM audit storage | Chart passes `helm lint` and `kubeconform -strict`; Terraform passes `validate`; both checked in CI |
+
+The deployed free-tier configuration is measured on the same frozen test split rather than assumed ([`eval/results/deployed/summary.md`](eval/results/deployed/summary.md)). Without a GPU it uses gte-small hybrid search instead of the Experiment 3 winner, which costs retrieval quality:
+
+| Configuration (rules mode) | Success | Route correct | Defect recall | Ask recall |
+|---|---|---|---|---|
+| Free tier: gte-small hybrid search in Supabase | 0.356 | 0.867 | 0.793 | 0.587 |
+| GPU profile: R5 (BGE-M3 hybrid + reranker + contextual chunks), H-det | 0.444 | 0.889 | 0.793 | 0.687 |
+
+A load test of the live demo (150 mixed requests at concurrency 10) sustained about 24 requests per second with no server errors; draft previews took 0.47 s at the median and under 2.4 s at p95; the only non-2xx responses were the rate limiter's 429s ([`eval/results/deployed/loadtest.json`](eval/results/deployed/loadtest.json)).
+
+---
+
+## Running the app locally
+
+No database, model or internet needed (in-memory store, keyword search):
+
+```bash
+uv venv .venv --python 3.11
+```
+```bash
+uv pip install --python .venv/Scripts/python.exe -r pyproject.toml --extra dev
+```
+```bash
+STORE=memory SEARCH=keyword .venv/Scripts/python.exe -m uvicorn src.app.main:app --port 8000
+```
+
+Then open http://localhost:8000. The full production-like stack is `docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build` (see [docs/deployment.md](docs/deployment.md)). Tests: `.venv/Scripts/python.exe -m pytest -q` (the Postgres integration tests run when `DATABASE_URL` points at a migrated database, as in CI).
+
+## Running Experiment 2 locally
+
+```bash
+.venv/Scripts/python.exe eval/exp12.py --tune
+```
+```bash
+OLLAMA_HOST=http://127.0.0.1:11435 RERANK_BATCH=8 .venv/Scripts/python.exe eval/exp12.py --exp 2 --workers 4
+```
+
+About 3.5 hours on the reference laptop with the parallel Ollama server (see `scripts/run_all_experiments.sh`); every LLM output is cached in `.cache/`, so `--report 2` rebuilds tables and figures in seconds.
 
 ---
 
@@ -105,7 +189,7 @@ uv venv .venv --python 3.11
 uv pip install --python .venv/Scripts/python.exe torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 ```
 ```bash
-uv pip install --python .venv/Scripts/python.exe -r pyproject.toml --extra dev
+uv pip install --python .venv/Scripts/python.exe -r pyproject.toml --extra experiments --extra dev
 ```
 ```bash
 ollama pull qwen2.5:7b
@@ -167,6 +251,8 @@ The Scoreboard, the audit log and the validation engine in the project plan alre
 ---
 
 ## Part 1 — Production tech stack, end to end
+
+> **Superseded where they differ by [docs/architecture.md](docs/architecture.md)** (17 October 2026), which records each change as a decision with its evidence. The main changes: the database is the workflow engine (no LangGraph Agent Server; LangGraph is used inside the H4 harness only), Postgres is the job queue (no Redis or Temporal), clause vectors live in the system-of-record Postgres (pgvector, no Qdrant), and drafting is rules-first with an optional LLM (Experiment 2). This part is kept as the research that led there.
 
 ### 1.1 Design principles
 

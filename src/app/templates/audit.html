@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Audit trail · Legal Agreement AI{% endblock %}
+{% block content %}
+<h1>Audit trail</h1>
+<p class="muted">Append-only and hash-chained: each event stores sha256 of the previous event's hash and its own content, and the database refuses updates and deletes. The chain is re-verified on every page load.</p>
+{% if chain.intact %}<div class="alert ok">Chain intact: {{ chain.checked }} events verified.</div>{% else %}<div class="alert bad">Chain broken at event {{ chain.broken_at }}.</div>{% endif %}
+<div class="card table-wrap">
+  <table>
+    <thead><tr><th class="num">#</th><th>Time (UTC)</th><th>Request</th><th>Event</th><th>Actor</th><th>Hash</th></tr></thead>
+    <tbody>
+    {% for e in events %}
+      <tr><td class="num">{{ e.id }}</td><td class="small">{{ e.at[:19] | replace('T', ' ') }}</td><td>{% if e.request_id %}<a href="/requests/{{ e.request_id }}">{{ e.ref }}</a>{% endif %}</td><td>{{ e.event | replace('_', ' ') }}</td><td>{{ e.actor }} <span class="small muted">({{ e.actor_role }})</span></td><td class="hash">{{ e.hash[:16] }}…</td></tr>
+    {% else %}
+      <tr><td colspan="6" class="muted">No events yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

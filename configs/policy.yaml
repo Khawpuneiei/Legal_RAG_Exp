@@ -1,0 +1,66 @@
+# Legal drafting policy used by the deterministic Validation Engine and Routing Policy.
+# Synthetic, for this project only: it is NOT ICHAM's policy and NOT legal advice.
+# Changing this file is a controlled change (MAS AI RM Guidelines 5.10(d)); its sha256 is written to every audit event.
+version: "2026-10-16"
+
+agreement_types:
+  NDA:
+    template_id: TEMPLATE-NDA
+    title: Mutual Non-Disclosure Agreement
+    required_fields: [counterparty_name, counterparty_type, purpose, term_months, target_signing_date, effective_date, governing_law]
+  IMA:
+    template_id: TEMPLATE-IMA
+    title: Investment Management Agreement
+    required_fields: [counterparty_name, counterparty_type, strategy, mandate_size_sgd_m, management_fee_pct, custodian_name, target_signing_date, effective_date, governing_law]
+  DIST:
+    template_id: TEMPLATE-DIST
+    title: Distribution Agreement
+    required_fields: [counterparty_name, counterparty_type, fund_name, territory, trailer_fee_pct, target_signing_date, effective_date, governing_law]
+  SIDE:
+    template_id: TEMPLATE-SIDE
+    title: Side Letter
+    required_fields: [counterparty_name, counterparty_type, fund_name, commitment_usd_m, target_signing_date, effective_date, governing_law]
+  SUBS:
+    template_id: TEMPLATE-SUBS
+    title: Subscription Agreement
+    required_fields: [counterparty_name, counterparty_type, fund_name, subscription_amount_sgd_m, target_signing_date, dealing_date, governing_law]
+
+# Approved commercial ranges (inclusive). A value outside its range is an out_of_range issue and escalates.
+ranges:
+  term_months: [12, 60]
+  management_fee_pct: [0.50, 1.50]
+  performance_fee_pct: [0, 20]
+  mandate_size_sgd_m: [10, 2000]
+  trailer_fee_pct: [0, 50]          # share of the management fee paid to the distributor, in per cent
+  fee_rebate_bps: [0, 50]
+  commitment_usd_m: [1, 1000]
+  subscription_amount_sgd_m: [0.1, 500]
+
+governing_law:
+  standard: Singapore
+  approved_fallbacks: ["England and Wales"]   # allowed, but a material deviation (escalates)
+
+dates:
+  backdating_allowed: false        # effective_date / dealing_date must not precede target_signing_date
+  max_days_after_signing: 180
+
+# Clauses whose deviation_cost is at or above this threshold are material deviations from the standard template.
+material_deviation_cost: 0.5
+
+issue_types:
+  missing_field: "A required field is missing and cannot be found in the request."
+  date_conflict: "Dates are inconsistent (backdated, contradicting the request text, or too far after signing)."
+  out_of_range: "A commercial term is outside the approved range."
+  governing_law: "Governing law is not approved, or the form contradicts the request text."
+  name_mismatch: "The counterparty name on the form does not match the request text."
+  unsupported_clause: "The request asks for a term that has no approved clause in the library."
+  prompt_injection: "The request text tries to instruct the drafting system (e.g. to skip review)."
+
+routing:
+  # precedence: escalate > return_to_requester > standard_review
+  escalate_on: [out_of_range, governing_law, unsupported_clause, prompt_injection, material_deviation]
+  return_on: [missing_field, date_conflict, name_mismatch]
+  routes:
+    standard_review: "Legal reviewer"
+    escalate: "Senior Legal / Compliance"
+    return_to_requester: "Back to the requester to fix the request"

@@ -1,0 +1,9 @@
+{
+  "supabase-hybrid-gte-small": {
+    "lo": 0.78,
+    "hi": 0.9,
+    "tau": 1.0,
+    "objective": 0.7150000000000001,
+    "tuned_on": "dev split (30 requests), objective of eval/exp12.py --tune"
+  }
+}

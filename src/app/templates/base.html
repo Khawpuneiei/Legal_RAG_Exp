@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Legal Agreement AI{% endblock %}</title>
+  <meta name="description" content="AI-assisted legal agreement drafting with human review for a MAS-regulated fund manager (synthetic data).">
+  <link rel="stylesheet" href="/static/app.css">
+  {% block head %}{% endblock %}
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231f4e79'/%3E%3Cpath d='M9 8h11l4 4v12H9z' fill='white'/%3E%3C/svg%3E">
+</head>
+<body>
+{% if demo %}<div class="banner">Demo environment. Synthetic data only, identities are role switches (not authentication). Every draft requires human Legal approval. Not legal advice.</div>{% endif %}
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="/">Legal Agreement <span>AI</span></a>
+    <nav class="main">
+      <a href="/requests/new">New request</a>
+      <a href="/queue">Review queue</a>
+      <a href="/audit">Audit trail</a>
+      <a href="/scoreboard">Scoreboard</a>
+      <a href="/architecture">Architecture</a>
+      <a href="/governance">Governance</a>
+      <a href="/api/docs">API</a>
+    </nav>
+    <form class="role" method="post" action="/role">
+      <input type="hidden" name="next" value="{{ request.url.path }}">
+      <select name="role" aria-label="Acting as" data-autosubmit>
+        {% for k, v in roles.items() %}<option value="{{ k }}" {% if k == role %}selected{% endif %}>{{ v }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+<footer>
+  Drafting mode <code>{{ mode }}</code> · store <code>{{ store_name }}</code> · search <code>{{ search_name }}</code> · policy <code>{{ policy_sha }}</code> · library <code>{{ library_sha }}</code> · env <code>{{ env }}</code>
+</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

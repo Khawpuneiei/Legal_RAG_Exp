@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Governance · Legal Agreement AI{% endblock %}
+{% block content %}
+<h1>AI governance</h1>
+<p class="muted">How the system is designed to meet the MAS Guidelines on Artificial Intelligence Risk Management (issued 7 October 2026; sections 3–4 apply from 7 October 2027, sections 5–6 by 7 October 2028). The full mapping and the AI inventory entry are in <code>docs/governance.md</code>.</p>
+
+<div class="grid g2">
+  <div class="card">
+    <h2>AI inventory entry</h2>
+    <dl class="kv">
+      <dt>Use case</dt><dd>Drafting support for standard agreements (NDA, IMA, distribution, side letter, subscription)</dd>
+      <dt>Decision role</dt><dd>Assists Legal; never executes. Every draft needs human approval; escalated drafts need Senior Legal / Compliance.</dd>
+      <dt>Model(s)</dt><dd>Deployment mode <code>{{ mode }}</code>. Rules mode uses no generative model. Assist/agent modes use an approved LLM behind an OpenAI-compatible gateway (evaluated: qwen2.5:7b local).</dd>
+      <dt>Data</dt><dd>Synthetic requests and a synthetic clause library. PII masked before storage or any LLM call.</dd>
+      <dt>Proposed materiality</dt><dd>Lower (internal drafting copilot with mandatory human review, footnotes 12–13), subject to the control function's approval (4.13).</dd>
+      <dt>Versions</dt><dd>policy <code>{{ policy_sha }}</code>, library <code>{{ library_sha }}</code>; both are written into every audit event.</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h2>Controls</h2>
+    <table><tbody>
+      <tr><td>Human oversight (5.9)</td><td>Routing policy with pre-defined escalation conditions; approval only via <code>api_review</code>; decisions and near misses logged.</td></tr>
+      <tr><td>Auditability (5.17)</td><td>Hash-chained, append-only audit events with policy, library, code and prompt hashes.</td></tr>
+      <tr><td>Testing (5.14, fn 46)</td><td>Scoreboard on a frozen test set; prompt-injection and hallucination metrics; release gate in CI.</td></tr>
+      <tr><td>Third-party AI (5.10)</td><td>Model behind a gateway; replaceable; tested on our own data; compensating controls are the rules engine and human review.</td></tr>
+      <tr><td>Data (2.5(b))</td><td>No confidential data to public tools: PII guard, synthetic data in the demo, region-pinned services (Singapore).</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<h2>Drafting policy in force</h2>
+<div class="grid g2">
+  <div class="card">
+    <h3>Approved ranges</h3>
+    <table><tbody>{% for k, v in policy.ranges.items() %}<tr><td><code>{{ k }}</code></td><td class="num">{{ v[0] }} – {{ v[1] }}</td></tr>{% endfor %}</tbody></table>
+  </div>
+  <div class="card">
+    <h3>Routing</h3>
+    <p>Escalate on: {% for t in policy.routing.escalate_on %}<code>{{ t }}</code> {% endfor %}</p>
+    <p>Return to requester on: {% for t in policy.routing.return_on %}<code>{{ t }}</code> {% endfor %}</p>
+    <p>Material deviation threshold: deviation cost ≥ <code>{{ policy.material_deviation_cost }}</code>. Governing law: {{ policy.governing_law.standard }}; approved fallback {{ policy.governing_law.approved_fallbacks | join(', ') }}.</p>
+  </div>
+</div>
+{% endblock %}
