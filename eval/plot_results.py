@@ -88,8 +88,43 @@ def graph_chart(rows):
     plt.close(fig)
 
 
+def generation_chart():
+    """Small multiples (one axis per metric, same 0-1 scale) from generation_summary.json."""
+    import json
+    import math
+    path = RES / "generation_summary.json"
+    if not path.exists():
+        return
+    summ = json.loads(path.read_text(encoding="utf-8"))
+    conds = ["R0", "R1", "R4", "R5"]
+    panels = [("hallucinated_rate", "Hallucinated-clause rate\n(lower is better)"),
+              ("citation_accuracy", "Citation accuracy\n(higher is better)"),
+              ("ask_recall", "Ask recall\n(higher is better)")]
+    fig, axes = plt.subplots(1, 3, figsize=(10, 3.6), facecolor=SURFACE, sharey=True)
+    for ax, (metric, title) in zip(axes, panels):
+        style(ax)
+        ax.xaxis.grid(False)
+        ax.yaxis.grid(True, color=GRID, linewidth=0.8)
+        for i, c in enumerate(conds):
+            s = next((r for r in summ if r["condition"] == c and r["metric"] == metric), None)
+            if s is None or s["mean"] is None or (isinstance(s["mean"], float) and math.isnan(s["mean"])):
+                ax.text(i, 0.03, "n/a", ha="center", va="bottom", fontsize=9, color=INK2)
+                continue
+            ax.bar(i, s["mean"], width=0.6, color=SERIES[0], edgecolor=SURFACE, linewidth=2)
+            ax.errorbar(i, s["mean"], yerr=[[s["mean"] - s["ci_low"]], [s["ci_high"] - s["mean"]]], fmt="none", ecolor=INK2, elinewidth=1, capsize=3)
+            ax.text(i, s["ci_high"] + 0.03, f"{s['mean']:.2f}", ha="center", va="bottom", fontsize=9, color=INK)
+        ax.set_xticks(range(len(conds)), conds, color=INK)
+        ax.set_ylim(0, 1.12)
+        ax.set_title(title, color=INK, fontsize=10)
+    fig.suptitle("Generation and grounding: 90 held-out requests x 3 seeds (qwen2.5:7b)", x=0.01, ha="left", color=INK, fontsize=11)
+    fig.tight_layout()
+    fig.savefig(FIG / "generation_grounding.png", dpi=160, facecolor=SURFACE)
+    plt.close(fig)
+
+
 def main():
     rows = load()
+    generation_chart()
     bars(rows, "synthetic", "ndcg@10", "Synthetic clause library: nDCG@10 by condition (90 test requests)", "nDCG@10", "synthetic_ndcg10.png")
     bars(rows, "synthetic", "recall@5", "Synthetic clause library: Recall@5 by condition", "Recall@5 (relevant clauses in top-5 chunks)", "synthetic_recall5.png")
     bars(rows, "acord-test", "ndcg@10", "ACORD test (57 queries): nDCG@10 by condition", "nDCG@10", "acord_ndcg10.png")

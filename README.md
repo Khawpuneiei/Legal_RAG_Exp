@@ -13,6 +13,76 @@ Every claim that came from a web source is linked. Claims first seen only in sec
 
 ---
 
+## Results by research question
+
+The project has five research questions: RQ1–RQ3 from the [project plan](docs/project-plan.md#3-objectives-and-research-questions) and the two this README adds. Only Experiment 3 has been run, so only some of them have measured answers so far.
+
+| Research question | Status | Evidence | Short answer |
+|---|---|---|---|
+| **RQ1** (plan): does a `SKILL.md` playbook improve drafting over a vanilla LLM? | Not run yet | Experiment 1 (planned) | – |
+| **RQ2** (plan): does an agent harness outperform a single LLM call? | Not run yet | Experiment 2 (planned) | – |
+| **RQ3** (plan): does a stronger retrieval pipeline improve accuracy and grounding? | **Answered** | Experiment 3: three benchmarks and a grounding eval | **Yes**, below |
+| **Q2** (README): does A\*-guided clause-graph retrieval help? | **Partly answered** | Experiment 3, conditions R6a–R6d | **Yes for self-contained evidence; no against plain BFS**, below |
+| **Q1** (README): which production stack? | Design question, no benchmark | Part 1; Experiment 3 sets the retrieval configuration | See Part 1 |
+
+All numbers come from [docs/experiment3-results.md](docs/experiment3-results.md), with paired significance tests in [`eval/results/exp3/significance.md`](eval/results/exp3/significance.md). "Significant" means the 95% paired bootstrap CI of the difference excludes zero.
+
+### RQ3 — Does a stronger retrieval pipeline improve accuracy and grounding?
+
+**Answer: yes.** Compared with naive RAG (R1), the hybrid + reranker pipeline (R4) and its contextual-chunk version (R5) retrieve the requested clauses better on our use case. They also make the drafting model cite approved clauses instead of inventing them.
+
+| Benchmark | Queries | Metric | No retrieval (R0) | Naive RAG (R1) | Hybrid + reranker (R4) | + contextual chunks (R5) |
+|---|---|---|---|---|---|---|
+| Synthetic clause library (Singapore context) | 90 held-out requests | nDCG@10 | – | 0.192 | 0.511 | **0.536** |
+| Synthetic clause library | 90 | Recall@5 | – | 0.371 | 0.358 | **0.488** |
+| [ACORD](https://huggingface.co/datasets/theatticusproject/acord) (attorney-rated clause retrieval) | 57 test queries | nDCG@10 | – | 0.554 | 0.581 (0.606 with Qwen3-Embedding, R4e) | not run (no parent documents) |
+| [LegalBench-RAG-mini](https://github.com/zeroentropy-ai/legalbenchrag) (span retrieval) | 776 | Recall within 8,000 retrieved characters | – | 0.408 | 0.345 | **0.631** |
+| Grounding eval (qwen2.5:7b, 3 seeds) | 90 held-out requests | Hallucinated-clause rate (lower is better) | 0.995 | 0.019 | 0.008 | **0.006** |
+| Grounding eval | 90 | Ask recall (requested clauses correctly cited) | 0.000 | 0.340 | 0.521 | **0.556** |
+| Grounding eval | 90 | Citation accuracy | – | 0.493 | **0.617** | 0.606 |
+
+<p>
+  <img src="eval/results/exp3/figures/synthetic_ndcg10.png" alt="Synthetic clause library nDCG@10 by condition: R1 0.192, R2 0.284, R3 0.439, R4 0.511, R4e 0.519, R4q 0.454, R5 0.536, BM25 alone 0.469" width="49%">
+  <img src="eval/results/exp3/figures/generation_grounding.png" alt="Generation and grounding: hallucinated-clause rate R0 1.00, R1 0.02, R4 0.01, R5 0.01; citation accuracy R1 0.49, R4 0.62, R5 0.61; ask recall R0 0.00, R1 0.34, R4 0.52, R5 0.56" width="49%">
+</p>
+<p>
+  <img src="eval/results/exp3/figures/acord_ndcg10.png" alt="ACORD test nDCG@10 by condition: BM25 0.443, R1 0.554, R2 0.574, R3 0.550, R4 0.581, R4e 0.606, R4q 0.609" width="49%">
+  <img src="eval/results/exp3/figures/lbr_recall_8kchars.png" alt="LegalBench-RAG-mini recall within 8,000 retrieved characters: BM25 0.150, R1 0.408, R2 0.338, R3 0.270, R4 0.345, R4e 0.366, R4q 0.321, R5 0.631" width="49%">
+</p>
+
+- **Retrieval is what makes grounded drafting possible.** Without the library, 99.5% of drafted clauses cannot be traced to an approved clause. With any retrieval it is 2% or less (R1 vs R0: −0.976, significant).
+- **The full pipeline beats naive RAG.** On our requests, nDCG@10 is +0.32 for R4 over R1, and ask recall is +0.18 (significant), while R4 shows the model one sixth of the context (5 clauses vs about 31). The citation-accuracy gain (+0.11) is borderline, with a CI that just includes zero.
+- **Contextual enrichment is the strongest single lever.** It roughly doubles LegalBench-RAG recall at an equal budget and triples precision@1. On our requests it lifts Recall@5 by +0.13 (significant).
+- **What did not help:** BM25 hybrid hurts on LegalBench-RAG's formal queries (it helps on staff requests). The doctrinal query rewrite (R4q) with a local 7B model is significantly worse on two of three datasets. Swapping in Qwen3-Embedding (R4e) gives only a small gain.
+- **External reference points:** on ACORD, our scores sit in the paper's range. BGE-M3 dense scores 0.574, against 0.641 for OpenAI-large in the paper. GPT-4o reranking (0.797 in the paper) is the gap still to close.
+
+### README Q2 — Does A\*-guided clause-graph retrieval help?
+
+**Answer: it makes the evidence self-contained, but it does not beat plain BFS on definitions, as hypothesised.** All conditions get the same 1,200-token budget on the synthetic test split.
+
+| Condition | Clause recall | Definition coverage | Cross-reference completeness | Legal requirements satisfied |
+|---|---|---|---|---|
+| R5 flat retrieval (same budget) | **0.682** | 0.334 | 0.418 | 0.431 |
+| R6a BFS depth 2 | 0.508 | **0.990** | **0.996** | 0.690 |
+| R6c A\*, admissible heuristic | 0.644 | 0.974 | 0.685 | 0.950 |
+| R6d A\*, tuned heuristic | 0.642 | 0.984 | 0.796 | **0.979** |
+
+<img src="eval/results/exp3/figures/synthetic_graph.png" alt="Graph expansion at an equal 1,200-token budget: clause recall, definition coverage and cross-reference completeness for R5@budget, R6a, R6b, R6c and R6d" width="70%">
+
+- A\* raises definition coverage by +0.64 over flat retrieval at the same budget, with no significant loss of the requested clauses (clause recall −0.04, not significant). The drafter receives each clause together with the definitions and linked clauses it depends on.
+- The pre-registered hypothesis "A\* beats BFS on definition coverage and cross-reference completeness" is **rejected**. BFS scores higher on both, but it finds about a fifth fewer of the requested clauses (0.508 vs 0.644) and satisfies fewer legal requirements (0.690 vs 0.950).
+- The heuristic tuned on dev is inadmissible and better (+0.11 cross-reference completeness, significant). This matches the Distance-Indexed Neural A\* paper (section 2.2).
+
+### README Q1 — Production stack
+
+There is no benchmark for this question. It is answered by design in [Part 1](#part-1--production-tech-stack-end-to-end). Experiment 3 changes one decision: the release-gate retrieval configuration becomes **R5 + R6d** (hybrid search, reranker, contextual chunks, then A\* graph expansion) instead of R4 (section 1.5).
+
+### RQ1 and RQ2 — not run yet
+
+Experiments 1 (skill files, conditions S0–S5) and 2 (agent harness, conditions H0–H4) are designed in the [project plan](docs/project-plan.md#5-experiment-design) but not implemented. They would reuse the same synthetic requests, which already exist, and the same Scoreboard metrics. The plan's planted-defect labels (missing fields, conflicting dates, fee out of range and others) still need to be added to `data/synthetic/requests.jsonl` before Experiment 2 can measure defect recall.
+
+---
+
 ## Running Experiment 3 locally
 
 Experiment 3 compares retrieval pipelines against no retrieval and naive RAG (plan section 5.4, README 2.4.4 and 2.7). It runs on one machine. The reference run used Windows 11, an RTX 4060 laptop GPU (8 GB) and 16 GB RAM. All LLM steps use a local model through [Ollama](https://ollama.com), so no API key is needed and no data leaves the machine.
@@ -68,7 +138,7 @@ On Linux or macOS, use `.venv/bin/python`. Without an NVIDIA GPU, install the CP
 
 LLM outputs, embeddings and reranker scores are cached in `.cache/`, so reruns take minutes.
 
-**Headline result** (details in [docs/experiment3-results.md](docs/experiment3-results.md)): on our synthetic clause library, nDCG@10 rises from 0.19 for naive RAG to 0.51 with hybrid search plus a reranker, and to 0.54 with contextual chunks. Summary-augmented chunks roughly double LegalBench-RAG recall at an equal budget. A\* graph expansion lifts definition coverage from 0.33 to 0.97 at the same token budget. Without retrieval, 99% of drafted clauses cannot be traced to an approved clause; with retrieval, under 6%.
+**Results:** see [Results by research question](#results-by-research-question) above, and [docs/experiment3-results.md](docs/experiment3-results.md) for the full write-up.
 
 ---
 
@@ -107,8 +177,13 @@ The Scoreboard, the audit log and the validation engine in the project plan alre
 
 ### 1.2 Reference architecture
 
+![Reference architecture: clients go through an Entra ID API gateway to a stateless FastAPI service and LangGraph Agent Server; the agent calls an LLM gateway (Azure OpenAI, Anthropic, local vLLM/Ollama), an embedding and reranker service, PostgreSQL, the vector index and Redis; queue workers render documents to object storage and call SharePoint and e-signature; Langfuse and OpenTelemetry collect traces and metrics](docs/figures/architecture.png)
+
+<details>
+<summary>Mermaid source (edit <code>docs/figures/architecture.mmd</code>, then re-render the PNG)</summary>
+
 ```mermaid
-flowchart TB
+flowchart LR
   subgraph Clients
     U1[Staff request UI<br/>Streamlit prototype → React/Next.js or Teams app]
     U2[Legal reviewer queue]
@@ -170,6 +245,14 @@ flowchart TB
   LLMGW -. cost/usage .-> LF
   API -. metrics .-> OTEL
 ```
+
+Re-render with mermaid-cli. On the first run, npx downloads mermaid-cli and a headless Chromium; to reuse an installed Chrome instead, pass `-p` with a puppeteer config that sets `executablePath`.
+
+```bash
+npx -y @mermaid-js/mermaid-cli@11.4.2 -i docs/figures/architecture.mmd -o docs/figures/architecture.png -c docs/figures/mermaid-config.json -b white -s 2 -w 1400
+```
+
+</details>
 
 Grey/blue/orange colouring from the plan still applies: deterministic code, LLM, human checkpoints. The "Experiment Switchboard" (skill, harness mode, retrieval mode) becomes **configuration served by the API**, so production and research runs share one code path.
 

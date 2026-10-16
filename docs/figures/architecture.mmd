@@ -1,0 +1,61 @@
+flowchart LR
+  subgraph Clients
+    U1[Staff request UI<br/>Streamlit prototype → React/Next.js or Teams app]
+    U2[Legal reviewer queue]
+    U3[Scoreboard / management reporting]
+  end
+
+  subgraph Edge
+    GW[API gateway + auth<br/>Entra ID OIDC, RBAC]
+  end
+
+  subgraph App["Application tier (stateless, scale out)"]
+    API[FastAPI service<br/>Pydantic schemas, PII guard]
+    AGENT[LangGraph Agent Server<br/>router → populate → retrieve → draft → validate → interrupt]
+    WORK[Queue workers<br/>indexing, docx render, e-sign callbacks]
+  end
+
+  subgraph AI["AI services"]
+    LLMGW[LLM gateway<br/>LiteLLM proxy: routing, limits, cost]
+    PROV1[Azure OpenAI<br/>Data Zone APAC]
+    PROV2[Anthropic / other API]
+    PROV3[Local vLLM or Ollama<br/>small open model]
+    EMB[Embedding + reranker service<br/>bge-m3 / bge-reranker]
+  end
+
+  subgraph Data["Data tier"]
+    PG[(PostgreSQL<br/>requests, drafts, approvals,<br/>LangGraph checkpoints,<br/>audit_events append-only)]
+    VEC[(Vector + lexical index<br/>pgvector + tsvector, or Qdrant)]
+    REDIS[(Redis<br/>pub-sub, queues, cache)]
+    OBJ[(Object storage<br/>templates, rendered .docx/.pdf,<br/>immutable copies)]
+  end
+
+  subgraph Integrations
+    SP[SharePoint via Microsoft Graph]
+    ESIGN[DocuSign / Acrobat Sign]
+    KYC[KnowYourCustomer, registers]
+  end
+
+  subgraph Observability
+    LF[Langfuse self-hosted<br/>traces, evals, prompt registry]
+    OTEL[OpenTelemetry → Grafana/Prometheus]
+  end
+
+  U1 --> GW --> API
+  U2 --> GW
+  U3 --> GW
+  API --> AGENT
+  AGENT --> LLMGW --> PROV1
+  LLMGW --> PROV2
+  LLMGW --> PROV3
+  AGENT --> EMB
+  AGENT --> VEC
+  AGENT --> PG
+  AGENT --> REDIS
+  WORK --> OBJ
+  WORK --> SP
+  WORK --> ESIGN
+  API -. traces .-> LF
+  AGENT -. traces .-> LF
+  LLMGW -. cost/usage .-> LF
+  API -. metrics .-> OTEL
