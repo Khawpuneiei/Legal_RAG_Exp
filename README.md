@@ -51,10 +51,24 @@ ollama pull qwen2.5:7b
 .venv/Scripts/python.exe eval/generation_eval.py
 ```
 ```bash
+.venv/Scripts/python.exe eval/significance.py
+```
+```bash
+.venv/Scripts/python.exe eval/plot_results.py
+```
+```bash
 .venv/Scripts/python.exe -m pytest -q
 ```
 
-On Linux or macOS, use `.venv/bin/python`. Without an NVIDIA GPU, install the CPU build of torch; the run then takes several hours. The first full run takes about 2–3 hours on the reference laptop, mostly local LLM calls. LLM outputs, embeddings and reranker scores are cached in `.cache/`, so reruns are fast.
+On Linux or macOS, use `.venv/bin/python`. Without an NVIDIA GPU, install the CPU build of torch; the run then takes considerably longer. On the reference laptop the first full run took about 3.5 hours, mostly local LLM calls:
+
+- about 1.6 h of query rewrites and contextual summaries;
+- about 35 min of retrieval;
+- about 80 min for the generation eval.
+
+LLM outputs, embeddings and reranker scores are cached in `.cache/`, so reruns take minutes.
+
+**Headline result** (details in [docs/experiment3-results.md](docs/experiment3-results.md)): on our synthetic clause library, nDCG@10 rises from 0.19 for naive RAG to 0.51 with hybrid search plus a reranker, and to 0.54 with contextual chunks. Summary-augmented chunks roughly double LegalBench-RAG recall at an equal budget. A\* graph expansion lifts definition coverage from 0.33 to 0.97 at the same token budget. Without retrieval, 99% of drafted clauses cannot be traced to an approved clause; with retrieval, under 6%.
 
 ---
 
@@ -201,7 +215,7 @@ Non-negotiables at every stage, from official docs: do not run the LangGraph ser
 
 - **dev → staging → prod**, each with its own Postgres, Redis and Langfuse project. Staging uses the same model deployments as prod but a separate quota.
 - **Prompt, skill and template versions are data, not code.** Promote them through Langfuse's prompt registry (or a `prompts` table) with the version hash written into every audit event. Changing a prompt is a change under MAS 5.10(d)/change management, so it goes through the same review as code.
-- **Release gate:** the CI eval job runs the 30-item subset for the production configuration (currently the plan's S2 + H3 + R4). Block on: hallucinated-clause rate above threshold, defect-detection recall below threshold, any prompt-injection test case passing through the validator.
+- **Release gate:** the CI eval job runs the 30-item subset for the production configuration. The plan's S2 + H3 + R4 becomes S2 + H3 + R5 with R6d graph expansion after Experiment 3 (see [docs/experiment3-results.md](docs/experiment3-results.md)). Block on: hallucinated-clause rate above threshold, defect-detection recall below threshold, any prompt-injection test case passing through the validator.
 - **Rollback:** images, prompts and templates are all versioned, so rollback is a Helm rollback plus a prompt version pin.
 - **Model upgrades:** a new model version is a new experimental condition on the Scoreboard before it becomes the default. This is the "evaluate alternatives" evidence MAS asks for in 5.14.
 
