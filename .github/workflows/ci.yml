@@ -56,7 +56,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv venv && uv pip install -r pyproject.toml --extra dev --extra postgres
-      - name: Apply migrations (twice: must be idempotent)
+      - name: Apply migrations twice (must be idempotent)
         run: uv run python -m src.app.migrate && uv run python -m src.app.migrate
       - name: Integration tests
         run: uv run pytest -q -m postgres

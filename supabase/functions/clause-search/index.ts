@@ -10,7 +10,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const LIBRARY_URL = "https://legal-agreement-ai.vercel.app/seed/library.json";
 const TYPES = ["NDA", "IMA", "DIST", "SIDE", "SUBS"];
-const BATCH = 12;
+const BATCH = 6;  // stays under the 2 s CPU limit of a free-tier Edge Function call
 const model = new Supabase.ai.Session("gte-small");
 const cors = {
   "Access-Control-Allow-Origin": "*",
