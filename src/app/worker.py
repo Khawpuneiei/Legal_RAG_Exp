@@ -8,14 +8,33 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import signal
+import sys
 import time
+from pathlib import Path
 
 from src.app.config import settings
 from src.app.main import llm, search, store
 
 log = logging.getLogger("worker")
 _stop = False
+HEARTBEAT = Path(os.environ.get("WORKER_HEARTBEAT", "/tmp/worker.heartbeat"))
+
+
+def beat() -> None:
+    """Liveness signal for Docker / Kubernetes: the probe fails if this file is older than 60 s."""
+    try:
+        HEARTBEAT.write_text(str(time.time()))
+    except OSError:
+        pass
+
+
+def healthy(max_age: float = 60.0) -> bool:
+    try:
+        return time.time() - float(HEARTBEAT.read_text()) < max_age
+    except (OSError, ValueError):
+        return False
 
 
 def _sigterm(*_):
@@ -49,9 +68,18 @@ def main() -> None:
     if settings().store != "postgres":
         raise SystemExit("the queue worker needs STORE=postgres")
     log.info(json.dumps(dict(event="worker_start", mode=settings().effective_mode)))
-    idle = 0.5
+    idle, backoff = 0.5, 1.0
     while not _stop:
-        if run_once():
+        beat()
+        try:
+            worked = run_once()
+            backoff = 1.0
+        except Exception as e:  # noqa: BLE001  database not migrated yet, network blip: retry, never crash-loop
+            log.warning(json.dumps(dict(event="worker_retry", error=f"{type(e).__name__}: {str(e)[:200]}", sleep_s=backoff)))
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 30.0)
+            continue
+        if worked:
             idle = 0.5
         else:
             time.sleep(idle)
@@ -60,4 +88,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--healthcheck"]:
+        sys.exit(0 if healthy() else 1)
     main()

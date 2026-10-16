@@ -33,3 +33,4 @@ deploy/.env
 .terraform/
 *.tfstate*
 *.tfvars
+deploy/kind-secrets.env

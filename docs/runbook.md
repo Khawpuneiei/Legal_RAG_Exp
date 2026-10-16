@@ -11,7 +11,7 @@
 
 ## Common incidents
 
-**Requests stuck in QUEUED (queue mode).** Workers are down or failing. Check worker logs for `job_failed`; a job is retried 3 times and a lock older than 5 minutes is reclaimed. Scale workers: `kubectl -n legal-ai scale deploy/legal-legal-ai-worker --replicas=4`.
+**Requests stuck in QUEUED (queue mode).** Workers are down or failing. Check worker logs for `job_failed` and `worker_retry` (database unreachable or not migrated: the worker backs off up to 30 s and keeps its heartbeat, it does not crash-loop); a job is retried 3 times and a lock older than 5 minutes is reclaimed. Scale workers: `kubectl -n legal-ai scale deploy/legal-legal-ai-worker --replicas=4`.
 
 **`/readyz` reports search false.** Free tier: the Supabase project may be paused after a week of inactivity (resume it in the dashboard) or the Edge Function failed (check its logs). Kubernetes: TEI pods not ready (first start downloads the model).
 
@@ -44,8 +44,13 @@ docker build -f deploy/docker/Dockerfile -t legal-agreement-ai:local . && kind l
 kubectl create namespace legal-ai && kubectl -n legal-ai create secret generic legal-agreement-ai-secrets --from-env-file=deploy/kind-secrets.env
 ```
 ```bash
-helm upgrade --install legal deploy/helm/legal-agreement-ai -n legal-ai -f deploy/helm/legal-agreement-ai/values-kind.yaml --wait --timeout 15m
+helm upgrade --install legal deploy/helm/legal-agreement-ai -n legal-ai -f deploy/helm/legal-agreement-ai/values-kind.yaml --timeout 20m
 ```
+```bash
+kubectl -n legal-ai wait --for=condition=Ready pod -l app.kubernetes.io/component=api --timeout=300s
+```
+
+Do not use `--wait` with the in-cluster development database: its migrations run as a post-install hook, which Helm only starts after `--wait` is satisfied, and the API is not ready before the schema exists. With a managed database the migrations run pre-install, so `--wait` is fine.
 ```bash
 kubectl -n legal-ai port-forward svc/legal-legal-ai-api 8000:80
 ```

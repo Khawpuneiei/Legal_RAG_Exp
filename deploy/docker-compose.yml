@@ -59,6 +59,7 @@ services:
   worker:
     <<: *app
     command: ["python", "-m", "src.app.worker"]
+    healthcheck: { test: ["CMD", "python", "-m", "src.app.worker", "--healthcheck"], interval: 30s, timeout: 10s, retries: 3 }
     environment:
       <<: *app-env
       DATABASE_URL: postgresql://worker_login:${WORKER_DB_PASSWORD}@db:5432/legal

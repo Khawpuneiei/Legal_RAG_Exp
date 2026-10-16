@@ -2,6 +2,15 @@
 
 Three targets share one codebase and one set of migrations (see `docs/architecture.md`, section 4).
 
+## Verification record (16–17 October 2026)
+
+| Target | What was checked | Result |
+|---|---|---|
+| A. Free demo | 3 sample requests end to end, review permissions, audit chain, docx export, every page; load test of 150 requests at concurrency 10 | Pass: correct routes, Legal reviewer refused on an escalated draft, chain intact, about 24 requests/s with no server errors |
+| B. Docker Compose | Clean start (migrations, TEI, library sync), 4 requests through the queue workers, review permissions, audit chain, metrics, least privilege | Pass: drafted in 1.2 s, all routes correct; `app_login` and `worker_login` are refused direct table reads and audit deletes; all containers healthy |
+| C. Kubernetes (kind 1.31, Helm chart, `values-kind.yaml`) | Install with in-cluster Postgres, migration and sync hooks, API and workers ready, same end-to-end checks; `helm upgrade` to a new image | Pass on install and upgrade: rolling update with no downtime, pre-upgrade migration hook, data and audit chain kept |
+| CI (GitHub Actions) | Lint, tests, release gate, SQL integration tests on Postgres + pgvector, image smoke test, Helm lint + kubeconform, Terraform validate | All jobs green on the pull request |
+
 ## A. Free demo: Vercel + Supabase (live)
 
 **URL:** https://legal-agreement-ai.vercel.app

@@ -29,6 +29,13 @@ spec:
           image: {{ include "laai.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["python", "-m", "src.app.worker"]
+          livenessProbe:
+            exec:
+              command: ["python", "-m", "src.app.worker", "--healthcheck"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
           env:
             {{- include "laai.env" . | nindent 12 }}
             - name: DATABASE_URL
