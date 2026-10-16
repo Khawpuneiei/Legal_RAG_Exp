@@ -1,0 +1,5 @@
+Legal Agreement AI {{ .Chart.AppVersion }} deployed as release {{ .Release.Name }}.
+  API:     service {{ include "laai.fullname" . }}-api (ingress host {{ .Values.ingress.host }})
+  Workers: {{ include "laai.fullname" . }}-worker (processing mode {{ .Values.app.processing }})
+  Search:  TEI {{ .Values.embed.model }} + Postgres hybrid search
+Check:   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "laai.fullname" . }}-api 8000:80, then open http://localhost:8000/readyz

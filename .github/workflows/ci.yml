@@ -1,0 +1,93 @@
+name: ci
+# Every pull request and push to main: lint, unit + app tests, the deterministic release gate, SQL integration tests on
+# a real Postgres + pgvector, the container image, and the Helm chart. Vercel builds previews for pull requests and
+# deploys main to production through its Git integration once these checks pass (required status checks on main).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: lint + tests + release gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Install (app + dev only; the GPU experiment stack is not needed here)
+        run: uv venv && uv pip install -r pyproject.toml --extra dev
+      - name: Ruff
+        run: uv run ruff check src/app src/agreement src/drafting/engine.py src/drafting/assembly.py tests/test_app.py tests/test_release_gate.py tests/test_db_postgres.py eval/deployed_eval.py
+      - name: Tests (app, workflow, release gate)
+        run: uv run pytest -q -m "not postgres"
+        env:
+          STORE: memory
+          SEARCH: keyword
+
+  db-integration:
+    name: SQL workflow on Postgres + pgvector
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.1-pg17
+        env:
+          POSTGRES_PASSWORD: ci-only-throwaway
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:ci-only-throwaway@localhost:5432/postgres
+      MIGRATION_DATABASE_URL: postgresql://postgres:ci-only-throwaway@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv venv && uv pip install -r pyproject.toml --extra dev --extra postgres
+      - name: Apply migrations (twice: must be idempotent)
+        run: uv run python -m src.app.migrate && uv run python -m src.app.migrate
+      - name: Integration tests
+        run: uv run pytest -q -m postgres
+
+  image:
+    name: container image smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f deploy/docker/Dockerfile --build-arg GIT_SHA=${{ github.sha }} -t legal-agreement-ai:ci .
+      - name: Run in memory mode and probe
+        run: |
+          docker run -d --name app -p 8000:8000 -e STORE=memory -e SEARCH=keyword -e PROCESSING=inline legal-agreement-ai:ci
+          for i in $(seq 1 30); do curl -fs localhost:8000/healthz && break; sleep 1; done
+          curl -fs localhost:8000/readyz
+          curl -fs -X POST localhost:8000/api/v1/requests -H 'content-type: application/json' \
+            -d '{"agreement_type":"NDA","form":{"counterparty_name":"Acme Pte Ltd"},"text":"Please prepare an NDA with Acme Pte Ltd."}' | grep -q '"route"'
+          docker logs app | tail -5
+
+  helm:
+    name: Helm chart lint + schema validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+      - run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz
+          helm lint deploy/helm/legal-agreement-ai
+          helm template demo deploy/helm/legal-agreement-ai | ./kubeconform -strict -summary -kubernetes-version 1.30.0
+          helm template demo deploy/helm/legal-agreement-ai -f deploy/helm/legal-agreement-ai/values-kind.yaml | ./kubeconform -strict -summary -kubernetes-version 1.30.0

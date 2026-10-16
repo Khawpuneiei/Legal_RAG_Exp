@@ -142,7 +142,7 @@ class MemoryStore:
         self.events: list[dict] = []
 
     def _now(self):
-        return dt.datetime.now(dt.timezone.utc).isoformat()
+        return dt.datetime.now(dt.UTC).isoformat()
 
     def _audit(self, rid, actor, role, event, details):
         prev = self.events[-1]["hash"] if self.events else None

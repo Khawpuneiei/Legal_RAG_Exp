@@ -1,0 +1,66 @@
+{{- if .Values.embed.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "laai.fullname" . }}-embed
+  labels:
+    {{- include "laai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: embed
+spec:
+  replicas: {{ .Values.embed.replicas }}
+  selector:
+    matchLabels:
+      {{- include "laai.selector" . | nindent 6 }}
+      app.kubernetes.io/component: embed
+  template:
+    metadata:
+      labels:
+        {{- include "laai.selector" . | nindent 8 }}
+        app.kubernetes.io/component: embed
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: tei
+          image: {{ .Values.embed.image }}
+          args: ["--model-id", {{ .Values.embed.model | quote }}, "--port", "8080"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: HUGGINGFACE_HUB_CACHE
+              value: /data
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            {{- toYaml .Values.embed.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: { sizeLimit: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "laai.fullname" . }}-embed
+  labels:
+    {{- include "laai.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "laai.selector" . | nindent 4 }}
+    app.kubernetes.io/component: embed
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+{{- end }}

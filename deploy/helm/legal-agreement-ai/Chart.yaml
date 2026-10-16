@@ -1,0 +1,7 @@
+apiVersion: v2
+name: legal-agreement-ai
+description: AI-assisted legal agreement drafting with human review (API, queue workers, embedding service, migrations, library sync)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.27.0-0"

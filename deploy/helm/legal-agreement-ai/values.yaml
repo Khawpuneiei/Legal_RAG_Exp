@@ -1,0 +1,65 @@
+# Production defaults. Override per environment (values-staging.yaml, values-production.yaml).
+image:
+  repository: ghcr.io/khawpuneiei/legal-agreement-ai
+  tag: ""                 # defaults to .Chart.AppVersion; CI sets the git SHA
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+app:
+  env: production
+  demoMode: false
+  draftingMode: auto      # rules | assist | agent | auto (assist when an LLM is configured)
+  processing: queue       # queue (async workers) | inline
+  search: postgres
+  llmBaseUrl: ""          # OpenAI-compatible gateway, e.g. http://litellm.ai-gateway.svc:4000/v1
+  llmModel: ""
+  rateLimitPerMin: 60
+
+# Secrets are never in values: point at a Secret managed by External Secrets / Key Vault CSI.
+# Keys expected: DATABASE_URL (app_login), WORKER_DATABASE_URL (worker_login), MIGRATION_DATABASE_URL (owner), LLM_API_KEY (optional)
+existingSecret: legal-agreement-ai-secrets
+
+api:
+  replicas: 2
+  webConcurrency: 2
+  resources: { requests: { cpu: 250m, memory: 384Mi }, limits: { cpu: "1", memory: 768Mi } }
+  autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 10, targetCPUUtilizationPercentage: 70 }
+  pdb: { minAvailable: 1 }
+
+worker:
+  replicas: 2
+  resources: { requests: { cpu: 250m, memory: 384Mi }, limits: { cpu: "1", memory: 1Gi } }
+  autoscaling: { enabled: true, minReplicas: 1, maxReplicas: 8, targetCPUUtilizationPercentage: 70 }
+  terminationGracePeriodSeconds: 120   # let an in-flight drafting job finish
+
+embed:
+  enabled: true
+  image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
+  model: thenlper/gte-small
+  replicas: 2
+  resources: { requests: { cpu: 500m, memory: 1Gi }, limits: { cpu: "2", memory: 2Gi } }
+
+migrations: { enabled: true }
+librarySync: { enabled: true, schedule: "15 * * * *" }   # also runs once as a post-install/upgrade hook
+
+ingress:
+  enabled: true
+  className: nginx
+  host: legal-ai.example.internal
+  tlsSecret: legal-ai-tls
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+    # Entra ID OIDC in front of the app (oauth2-proxy); the app trusts X-Auth-Request-* headers only from the proxy
+    nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.auth.svc.cluster.local/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://$host/oauth2/start?rd=$escaped_request_uri"
+
+networkPolicy: { enabled: true, ingressNamespace: ingress-nginx }
+
+# Development only: an in-cluster Postgres + pgvector (use a managed, backed-up database in production).
+devPostgres:
+  enabled: false
+  image: pgvector/pgvector:0.8.1-pg17
+  storage: 2Gi
+
+podSecurityContext: { runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: { type: RuntimeDefault } }
+containerSecurityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ["ALL"] } }

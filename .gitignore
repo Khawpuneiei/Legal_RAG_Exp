@@ -25,3 +25,6 @@ Thumbs.db
 .vercel
 
 .vercel
+
+# local stack secrets
+deploy/.env

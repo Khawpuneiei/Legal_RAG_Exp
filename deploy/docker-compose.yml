@@ -1,0 +1,72 @@
+# Production-like stack on one machine: Postgres + pgvector, migrations, gte-small embedding service (TEI), library sync,
+# API (gunicorn/uvicorn), queue worker. LLM optional: the host's Ollama (profile-free) or the `llm` profile.
+#   cp deploy/.env.example deploy/.env && docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+#   open http://localhost:8000
+name: legal-agreement-ai
+x-app: &app
+  build: { context: .., dockerfile: deploy/docker/Dockerfile }
+  image: legal-agreement-ai:local
+  restart: unless-stopped
+  environment: &app-env
+    APP_ENV: staging
+    DEMO_MODE: "true"
+    STORE: postgres
+    SEARCH: postgres
+    PROCESSING: queue
+    DRAFTING_MODE: ${DRAFTING_MODE:-auto}
+    EMBED_URL: http://embed:80
+    OLLAMA_HOST: ${OLLAMA_HOST:-}
+    LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b}
+    DATABASE_URL: postgresql://app_login:${APP_DB_PASSWORD}@db:5432/legal
+services:
+  db:
+    image: pgvector/pgvector:0.8.1-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: legal
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD}
+      WORKER_DB_PASSWORD: ${WORKER_DB_PASSWORD:?set WORKER_DB_PASSWORD}
+      TZ: UTC
+    volumes: [pgdata:/var/lib/postgresql/data, ./docker/initdb:/docker-entrypoint-initdb.d:ro]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d legal"], interval: 5s, retries: 20 }
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["python", "-m", "src.app.migrate"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/legal
+    depends_on: { db: { condition: service_healthy } }
+  embed:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
+    restart: unless-stopped
+    command: ["--model-id", "thenlper/gte-small", "--port", "80"]
+    volumes: [tei:/data]
+    healthcheck: { test: ["CMD-SHELL", "curl -fs http://localhost/health || exit 1"], interval: 10s, retries: 30 }
+  sync:
+    <<: *app
+    restart: "no"
+    command: ["python", "-m", "src.app.sync"]
+    environment:
+      <<: *app-env
+      MIGRATION_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/legal
+    depends_on: { migrate: { condition: service_completed_successfully }, embed: { condition: service_healthy } }
+  api:
+    <<: *app
+    ports: ["8000:8000"]
+    depends_on: { sync: { condition: service_completed_successfully } }
+  worker:
+    <<: *app
+    command: ["python", "-m", "src.app.worker"]
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgresql://worker_login:${WORKER_DB_PASSWORD}@db:5432/legal
+    depends_on: { sync: { condition: service_completed_successfully } }
+    deploy: { replicas: 2 }
+  ollama:
+    profiles: [llm]
+    image: ollama/ollama:0.12.6
+    volumes: [ollama:/root/.ollama]
+    deploy: { resources: { reservations: { devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }] } } }
+volumes: { pgdata: {}, tei: {}, ollama: {} }
