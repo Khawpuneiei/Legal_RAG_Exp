@@ -22,6 +22,9 @@ spec:
         app.kubernetes.io/component: api
       annotations:
         checksum/app-values: {{ toJson .Values.app | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: /metrics
     spec:
       serviceAccountName: {{ include "laai.fullname" . }}
       automountServiceAccountToken: false

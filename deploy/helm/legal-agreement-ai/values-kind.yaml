@@ -5,5 +5,5 @@ api: { webConcurrency: 1, autoscaling: { enabled: false }, replicas: 1, resource
 worker: { autoscaling: { enabled: false }, replicas: 1, resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 768Mi } } }
 embed: { replicas: 1, resources: { requests: { cpu: 200m, memory: 512Mi }, limits: { cpu: "2", memory: 2Gi } } }
 ingress: { enabled: false }
-networkPolicy: { enabled: true, ingressNamespace: ingress-nginx }
+networkPolicy: { enabled: true, ingressNamespace: ingress-nginx, monitoringNamespace: monitoring }
 devPostgres: { enabled: true }

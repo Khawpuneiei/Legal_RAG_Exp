@@ -77,6 +77,35 @@ jobs:
             -d '{"agreement_type":"NDA","form":{"counterparty_name":"Acme Pte Ltd"},"text":"Please prepare an NDA with Acme Pte Ltd."}' | grep -q '"route"'
           docker logs app | tail -5
 
+  publish:
+    name: publish image to GHCR (main only)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, db-integration, image, helm]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          build-args: GIT_SHA=${{ github.sha }}
+          push: true
+          provenance: true
+          sbom: true
+          tags: |
+            ghcr.io/khawpuneiei/legal-agreement-ai:${{ github.sha }}
+            ghcr.io/khawpuneiei/legal-agreement-ai:latest
+
   helm:
     name: Helm chart lint + schema validation
     runs-on: ubuntu-latest

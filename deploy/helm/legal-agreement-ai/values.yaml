@@ -53,7 +53,7 @@ ingress:
     nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.auth.svc.cluster.local/oauth2/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://$host/oauth2/start?rd=$escaped_request_uri"
 
-networkPolicy: { enabled: true, ingressNamespace: ingress-nginx }
+networkPolicy: { enabled: true, ingressNamespace: ingress-nginx, monitoringNamespace: monitoring }   # monitoring scrapes /metrics
 
 # Development only: an in-cluster Postgres + pgvector (use a managed, backed-up database in production).
 devPostgres:

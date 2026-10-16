@@ -97,6 +97,23 @@ def draft_for(agreement_type: str, form: dict, text: str) -> dict:
 
 # --------------------------------------------------------------------------------------------- middleware
 _hits: dict[str, deque] = defaultdict(deque)
+# Prometheus metrics (per process; scraped per pod in Kubernetes). No client library needed for counters/histograms.
+_BUCKETS = (0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60)
+_http_count: dict[tuple, int] = defaultdict(int)
+_http_hist: dict[tuple, list] = defaultdict(lambda: [0] * (len(_BUCKETS) + 1))
+_http_sum: dict[tuple, float] = defaultdict(float)
+_drafts: dict[tuple, int] = defaultdict(int)
+
+
+def _observe(method: str, route: str, status: int, seconds: float) -> None:
+    _http_count[(method, route, status)] += 1
+    key = (method, route)
+    _http_sum[key] += seconds
+    h = _http_hist[key]
+    for i, b in enumerate(_BUCKETS):
+        if seconds <= b:
+            h[i] += 1
+    h[-1] += 1
 
 
 @app.middleware("http")
@@ -125,6 +142,8 @@ async def guard(request: Request, call_next):
         "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
         "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     })
+    route = getattr(request.scope.get("route"), "path", "unmatched")
+    _observe(request.method, route, response.status_code, time.time() - t0)
     if request.url.path.startswith("/api/") or request.method == "POST":
         log.info(json.dumps(dict(event="http", method=request.method, path=request.url.path, status=response.status_code,
                                  ms=round((time.time() - t0) * 1000), request_id=rid)))
@@ -185,9 +204,12 @@ def create_request(agreement_type: str, form: dict, text: str, requester: str, r
     if settings().processing == "inline":
         payload["draft"] = draft_for(agreement_type, clean_form, masked)
     try:
-        return store().submit(payload)
+        res = store().submit(payload)
     except StoreError as e:
         raise HTTPException(400, str(e)) from e
+    d = payload.get("draft") or {}
+    _drafts[(agreement_type, d.get("mode", "queued"), d.get("route", "pending"))] += 1
+    return res
 
 
 def clause_view(cid: str) -> dict:
@@ -463,6 +485,24 @@ def api_version():
     s, lib = settings(), load_library()
     return dict(app=app.version, code=code_version(), env=s.env, store=store().name, search=getattr(search(), "name", "?"), drafting_mode=s.effective_mode,
                 processing=s.processing, policy_sha256=lib.policy_sha256, library_sha256=lib.library_sha256, llm=getattr(llm(), "model", None))
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    lines = ["# HELP http_requests_total HTTP requests by method, route template and status.", "# TYPE http_requests_total counter"]
+    for (m, r, st), n in sorted(_http_count.items()):
+        lines.append(f'http_requests_total{{method="{m}",route="{r}",status="{st}"}} {n}')
+    lines += ["# HELP http_request_duration_seconds Request latency.", "# TYPE http_request_duration_seconds histogram"]
+    for (m, r), h in sorted(_http_hist.items()):
+        for b, c in zip(_BUCKETS, h):
+            lines.append(f'http_request_duration_seconds_bucket{{method="{m}",route="{r}",le="{b}"}} {c}')
+        lines.append(f'http_request_duration_seconds_bucket{{method="{m}",route="{r}",le="+Inf"}} {h[-1]}')
+        lines.append(f'http_request_duration_seconds_sum{{method="{m}",route="{r}"}} {_http_sum[(m, r)]:.6f}')
+        lines.append(f'http_request_duration_seconds_count{{method="{m}",route="{r}"}} {h[-1]}')
+    lines += ["# HELP drafts_total Drafts produced by agreement type, drafting mode and route.", "# TYPE drafts_total counter"]
+    for (t, mode, rt), n in sorted(_drafts.items()):
+        lines.append(f'drafts_total{{agreement_type="{t}",mode="{mode}",route="{rt}"}} {n}')
+    return Response("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
 
 
 @app.get("/healthz", tags=["ops"])
