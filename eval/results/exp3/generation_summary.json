@@ -10,10 +10,10 @@
   {
     "condition": "R0",
     "metric": "hallucinated_rate",
-    "mean": 0.9888888888888888,
-    "ci_low": 0.9666666666666667,
+    "mean": 0.9953703703703705,
+    "ci_low": 0.9861111111111112,
     "ci_high": 1.0,
-    "n": 30
+    "n": 90
   },
   {
     "condition": "R0",
@@ -29,23 +29,15 @@
     "mean": 0.0,
     "ci_low": 0.0,
     "ci_high": 0.0,
-    "n": 28
-  },
-  {
-    "condition": "R0",
-    "metric": "abstention",
-    "mean": 1.0,
-    "ci_low": 1.0,
-    "ci_high": 1.0,
-    "n": 5
+    "n": 84
   },
   {
     "condition": "R0",
     "metric": "n_selections",
-    "mean": 2.066666666666667,
-    "ci_low": 1.7666666666666666,
-    "ci_high": 2.4,
-    "n": 30
+    "mean": 1.9740740740740743,
+    "ci_low": 1.8148148148148147,
+    "ci_high": 2.148148148148148,
+    "n": 90
   },
   {
     "condition": "R0",
@@ -53,127 +45,111 @@
     "mean": 0.0,
     "ci_low": 0.0,
     "ci_high": 0.0,
-    "n": 30
+    "n": 90
   },
   {
     "condition": "R0",
     "metric": "latency_s",
-    "mean": 6.9421777777777764,
-    "ci_low": 6.2009638888888885,
-    "ci_high": 7.717560555555555,
-    "n": 30
+    "mean": 6.6164703703703704,
+    "ci_low": 6.215631574074075,
+    "ci_high": 7.066798611111109,
+    "n": 90
   },
   {
     "condition": "R1",
     "metric": "citation_accuracy",
-    "mean": 0.47457264957264955,
-    "ci_low": 0.3115331196581197,
-    "ci_high": 0.6365384615384614,
-    "n": 26
+    "mean": 0.49337090713902315,
+    "ci_low": 0.38629428341384864,
+    "ci_high": 0.5987218196457327,
+    "n": 69
   },
   {
     "condition": "R1",
     "metric": "hallucinated_rate",
-    "mean": 0.05517241379310344,
-    "ci_low": 0.014942528735632184,
-    "ci_high": 0.10577586206896537,
-    "n": 29
+    "mean": 0.019157088122605366,
+    "ci_low": 0.0019157088122605363,
+    "ci_high": 0.04597701149425287,
+    "n": 87
   },
   {
     "condition": "R1",
     "metric": "claim_support",
-    "mean": 0.9365384615384615,
-    "ci_low": 0.8492948717948717,
-    "ci_high": 0.9923397435897434,
-    "n": 26
+    "mean": 0.9546698872785829,
+    "ci_low": 0.9140901771336554,
+    "ci_high": 0.9866364734299518,
+    "n": 69
   },
   {
     "condition": "R1",
     "metric": "ask_recall",
-    "mean": 0.39682539682539686,
-    "ci_low": 0.25,
-    "ci_high": 0.5416666666666666,
-    "n": 28
-  },
-  {
-    "condition": "R1",
-    "metric": "abstention",
-    "mean": 1.0,
-    "ci_low": 1.0,
-    "ci_high": 1.0,
-    "n": 5
+    "mean": 0.33994708994708994,
+    "ci_low": 0.25593584656084656,
+    "ci_high": 0.42991071428571426,
+    "n": 84
   },
   {
     "condition": "R1",
     "metric": "n_selections",
-    "mean": 2.5777777777777775,
-    "ci_low": 2.066666666666667,
-    "ci_high": 3.1113888888888876,
-    "n": 30
+    "mean": 2.2407407407407405,
+    "ci_low": 1.9850925925925926,
+    "ci_high": 2.5186111111111105,
+    "n": 90
   },
   {
     "condition": "R1",
     "metric": "context_clauses",
-    "mean": 32.13333333333333,
-    "ci_low": 30.9,
-    "ci_high": 33.266666666666666,
-    "n": 30
+    "mean": 31.31111111111111,
+    "ci_low": 30.388333333333335,
+    "ci_high": 32.15555555555556,
+    "n": 90
   },
   {
     "condition": "R1",
     "metric": "latency_s",
-    "mean": 7.843644444444444,
-    "ci_low": 6.8472388888888895,
-    "ci_high": 8.98945472222222,
-    "n": 30
+    "mean": 7.084562962962964,
+    "ci_low": 6.535599444444445,
+    "ci_high": 7.758339259259258,
+    "n": 90
   },
   {
     "condition": "R4",
     "metric": "citation_accuracy",
-    "mean": 0.5758547008547008,
-    "ci_low": 0.41559829059829057,
-    "ci_high": 0.7329594017094014,
-    "n": 26
+    "mean": 0.6174277016742771,
+    "ci_low": 0.5327891933028919,
+    "ci_high": 0.7032857686453575,
+    "n": 73
   },
   {
     "condition": "R4",
     "metric": "hallucinated_rate",
-    "mean": 0.01111111111111111,
+    "mean": 0.007777777777777778,
     "ci_low": 0.0,
-    "ci_high": 0.03333333333333333,
-    "n": 30
+    "ci_high": 0.018518518518518517,
+    "n": 90
   },
   {
     "condition": "R4",
     "metric": "claim_support",
-    "mean": 0.9476495726495726,
-    "ci_low": 0.8974358974358974,
-    "ci_high": 0.9871794871794872,
-    "n": 26
+    "mean": 0.9688736681887367,
+    "ci_low": 0.9457363013698631,
+    "ci_high": 0.9885844748858447,
+    "n": 73
   },
   {
     "condition": "R4",
     "metric": "ask_recall",
-    "mean": 0.5099206349206349,
-    "ci_low": 0.36706349206349204,
-    "ci_high": 0.6587301587301588,
-    "n": 28
-  },
-  {
-    "condition": "R4",
-    "metric": "abstention",
-    "mean": 1.0,
-    "ci_low": 1.0,
-    "ci_high": 1.0,
-    "n": 5
+    "mean": 0.521164021164021,
+    "ci_low": 0.43055555555555564,
+    "ci_high": 0.611111111111111,
+    "n": 84
   },
   {
     "condition": "R4",
     "metric": "n_selections",
-    "mean": 3.033333333333333,
-    "ci_low": 2.5330555555555554,
-    "ci_high": 3.588888888888889,
-    "n": 30
+    "mean": 2.725925925925926,
+    "ci_low": 2.4185185185185185,
+    "ci_high": 3.044537037037037,
+    "n": 90
   },
   {
     "condition": "R4",
@@ -181,63 +157,55 @@
     "mean": 5.0,
     "ci_low": 5.0,
     "ci_high": 5.0,
-    "n": 30
+    "n": 90
   },
   {
     "condition": "R4",
     "metric": "latency_s",
-    "mean": 6.871277777777778,
-    "ci_low": 6.1050288888888895,
-    "ci_high": 7.659560833333332,
-    "n": 30
+    "mean": 6.458677777777777,
+    "ci_low": 6.018044629629629,
+    "ci_high": 6.936788888888889,
+    "n": 90
   },
   {
     "condition": "R5",
     "metric": "citation_accuracy",
-    "mean": 0.5476190476190476,
-    "ci_low": 0.38492063492063494,
-    "ci_high": 0.7004464285714284,
-    "n": 28
+    "mean": 0.605761316872428,
+    "ci_low": 0.5124142661179699,
+    "ci_high": 0.6941015089163237,
+    "n": 81
   },
   {
     "condition": "R5",
     "metric": "hallucinated_rate",
-    "mean": 0.016666666666666666,
+    "mean": 0.00648148148148148,
     "ci_low": 0.0,
-    "ci_high": 0.05,
-    "n": 30
+    "ci_high": 0.015131172839506131,
+    "n": 90
   },
   {
     "condition": "R5",
     "metric": "claim_support",
-    "mean": 0.9392857142857143,
-    "ci_low": 0.875,
-    "ci_high": 0.9928571428571429,
-    "n": 28
+    "mean": 0.9707818930041151,
+    "ci_low": 0.9454732510288067,
+    "ci_high": 0.991769547325103,
+    "n": 81
   },
   {
     "condition": "R5",
     "metric": "ask_recall",
-    "mean": 0.5238095238095238,
-    "ci_low": 0.375,
-    "ci_high": 0.6668154761904754,
-    "n": 28
-  },
-  {
-    "condition": "R5",
-    "metric": "abstention",
-    "mean": 1.0,
-    "ci_low": 1.0,
-    "ci_high": 1.0,
-    "n": 5
+    "mean": 0.5562169312169313,
+    "ci_low": 0.4656084656084656,
+    "ci_high": 0.6428571428571429,
+    "n": 84
   },
   {
     "condition": "R5",
     "metric": "n_selections",
-    "mean": 2.8111111111111113,
-    "ci_low": 2.3444444444444446,
-    "ci_high": 3.355555555555555,
-    "n": 30
+    "mean": 2.7407407407407405,
+    "ci_low": 2.448148148148148,
+    "ci_high": 3.0556481481481477,
+    "n": 90
   },
   {
     "condition": "R5",
@@ -245,14 +213,202 @@
     "mean": 5.0,
     "ci_low": 5.0,
     "ci_high": 5.0,
-    "n": 30
+    "n": 90
   },
   {
     "condition": "R5",
     "metric": "latency_s",
-    "mean": 6.619688888888889,
-    "ci_low": 6.076225555555556,
-    "ci_high": 7.203865277777775,
-    "n": 30
+    "mean": 6.564837037037037,
+    "ci_low": 6.161466666666667,
+    "ci_high": 6.998923888888888,
+    "n": 90
+  },
+  {
+    "condition": "R0",
+    "metric": "correct_abstention",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R0",
+    "metric": "false_citation",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R0",
+    "metric": "missing_ask_drafted",
+    "mean": 1.0,
+    "ci_low": 1.0,
+    "ci_high": 1.0,
+    "n": 10
+  },
+  {
+    "condition": "R0",
+    "metric": "missing_ask_omitted",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R0",
+    "metric": "abstention_lenient",
+    "mean": 1.0,
+    "ci_low": 1.0,
+    "ci_high": 1.0,
+    "n": 10
+  },
+  {
+    "condition": "R1",
+    "metric": "correct_abstention",
+    "mean": 1.0,
+    "ci_low": 1.0,
+    "ci_high": 1.0,
+    "n": 10
+  },
+  {
+    "condition": "R1",
+    "metric": "false_citation",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R1",
+    "metric": "missing_ask_drafted",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R1",
+    "metric": "missing_ask_omitted",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R1",
+    "metric": "abstention_lenient",
+    "mean": 1.0,
+    "ci_low": 1.0,
+    "ci_high": 1.0,
+    "n": 10
+  },
+  {
+    "condition": "R4",
+    "metric": "correct_abstention",
+    "mean": 1.0,
+    "ci_low": 1.0,
+    "ci_high": 1.0,
+    "n": 10
+  },
+  {
+    "condition": "R4",
+    "metric": "false_citation",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R4",
+    "metric": "missing_ask_drafted",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R4",
+    "metric": "missing_ask_omitted",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R4",
+    "metric": "abstention_lenient",
+    "mean": 1.0,
+    "ci_low": 1.0,
+    "ci_high": 1.0,
+    "n": 10
+  },
+  {
+    "condition": "R5",
+    "metric": "correct_abstention",
+    "mean": 1.0,
+    "ci_low": 1.0,
+    "ci_high": 1.0,
+    "n": 10
+  },
+  {
+    "condition": "R5",
+    "metric": "false_citation",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R5",
+    "metric": "missing_ask_drafted",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R5",
+    "metric": "missing_ask_omitted",
+    "mean": 0.0,
+    "ci_low": 0.0,
+    "ci_high": 0.0,
+    "n": 10
+  },
+  {
+    "condition": "R5",
+    "metric": "abstention_lenient",
+    "mean": 1.0,
+    "ci_low": 1.0,
+    "ci_high": 1.0,
+    "n": 10
+  },
+  {
+    "condition": "R0",
+    "metric": "align_agreement",
+    "mean": NaN,
+    "n": 0,
+    "n_other_ask": 0
+  },
+  {
+    "condition": "R1",
+    "metric": "align_agreement",
+    "mean": 0.9363057324840764,
+    "n": 157,
+    "n_other_ask": 0
+  },
+  {
+    "condition": "R4",
+    "metric": "align_agreement",
+    "mean": 0.9308943089430894,
+    "n": 246,
+    "n_other_ask": 1
+  },
+  {
+    "condition": "R5",
+    "metric": "align_agreement",
+    "mean": 0.9156626506024096,
+    "n": 249,
+    "n_other_ask": 0
   }
 ]

@@ -23,7 +23,7 @@ Experiment 3 compares retrieval pipelines against no retrieval and naive RAG (pl
 | Public benchmarks: ACORD (test split, 57 queries) and LegalBench-RAG-mini (776 queries, rebuilt and checked against the paper's Table 3) | `scripts/download_public.py` → `data/public/` (not committed) |
 | Conditions R1–R6d, including R4e (embedder swap) and R4q (doctrinal query rewrite) | `configs/experiments/exp3.yaml`, `src/retrieval/` |
 | Retrieval metrics (Recall@k, MRR, nDCG, LegalBench-RAG character P/R, ACORD star precision) and graph metrics | `eval/metrics/retrieval_metrics.py`, `src/retrieval/graph.py` |
-| Generation and grounding eval (citation accuracy, hallucinated-clause rate, claim support, abstention) | `eval/generation_eval.py` |
+| Generation and grounding eval (citation accuracy, hallucinated-clause rate, claim support, per-requirement abstention) | `eval/generation_eval.py` |
 | Results | `eval/results/exp3/`, write-up in [docs/experiment3-results.md](docs/experiment3-results.md) |
 
 ```bash
@@ -60,11 +60,11 @@ ollama pull qwen2.5:7b
 .venv/Scripts/python.exe -m pytest -q
 ```
 
-On Linux or macOS, use `.venv/bin/python`. Without an NVIDIA GPU, install the CPU build of torch; the run then takes considerably longer. On the reference laptop the first full run took about 3.5 hours, mostly local LLM calls:
+On Linux or macOS, use `.venv/bin/python`. Without an NVIDIA GPU, install the CPU build of torch; the run then takes considerably longer. On the reference laptop a full run from an empty cache takes about 4 hours, mostly local LLM calls:
 
 - about 1.6 h of query rewrites and contextual summaries;
 - about 35 min of retrieval;
-- about 80 min for the generation eval.
+- about 2 h for the generation eval (90 test requests × 4 conditions × 3 seeds, about 6.6 s per call).
 
 LLM outputs, embeddings and reranker scores are cached in `.cache/`, so reruns take minutes.
 

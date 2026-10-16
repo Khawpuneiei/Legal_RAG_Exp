@@ -45,6 +45,13 @@ COMPARISONS = [
     ("synthetic-graph", "xref_completeness", "R6d", "R6c", "Tuned vs admissible heuristic"),
 ]
 
+GEN_COMPARISONS = [
+    ("citation_accuracy", "R4", "R1"), ("ask_recall", "R4", "R1"), ("hallucinated_rate", "R4", "R1"), ("claim_support", "R4", "R1"),
+    ("correct_abstention", "R4", "R1"), ("false_citation", "R4", "R1"),
+    ("citation_accuracy", "R5", "R4"), ("ask_recall", "R5", "R4"), ("correct_abstention", "R5", "R4"),
+    ("hallucinated_rate", "R1", "R0"),
+]
+
 
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -85,10 +92,13 @@ def main() -> None:
         per = {}
         for r in g:
             per.setdefault((r["condition"], r["qid"]), []).append(r)
-        lines += ["", "## Generation and grounding (30 test requests, means over 3 seeds per request)", "",
+        n_req = len({r["qid"] for r in g})
+        n_seeds = len({r["seed"] for r in g})
+        lines += ["", f"## Generation and grounding ({n_req} test requests, means over {n_seeds} seeds per request)", "",
+                  "Abstention metrics exist only for the requests with an unsupported ask, so their n is small. "
+                  "Wilcoxon p is shown only when at least 10 requests differ.", "",
                   "| Metric | A | B | Mean A − B [95% CI] | Wilcoxon p | n |", "|---|---|---|---|---|---|"]
-        for metric, a, b in [("citation_accuracy", "R4", "R1"), ("ask_recall", "R4", "R1"), ("hallucinated_rate", "R4", "R1"),
-                             ("ask_recall", "R5", "R4"), ("citation_accuracy", "R5", "R4"), ("hallucinated_rate", "R1", "R0")]:
+        for metric, a, b in GEN_COMPARISONS:
             d = []
             for (c, q), rs in per.items():
                 if c != a or (b, q) not in per:

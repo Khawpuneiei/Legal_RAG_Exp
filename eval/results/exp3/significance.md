@@ -30,13 +30,19 @@ A − B on the same queries (synthetic: 90-request test split). 95% paired boots
 | synthetic-graph | requires_satisfied | R6c | R6a | A* vs BFS | **+0.260 [+0.151, +0.365]** | 2.0e-05 | 84 |
 | synthetic-graph | xref_completeness | R6d | R6c | Tuned vs admissible heuristic | **+0.111 [+0.023, +0.198]** | 0.017 | 84 |
 
-## Generation and grounding (30 test requests, means over 3 seeds per request)
+## Generation and grounding (90 test requests, means over 3 seeds per request)
+
+Abstention metrics exist only for the requests with an unsupported ask, so their n is small. Wilcoxon p is shown only when at least 10 requests differ.
 
 | Metric | A | B | Mean A − B [95% CI] | Wilcoxon p | n |
 |---|---|---|---|---|---|
-| citation_accuracy | R4 | R1 | +0.114 [-0.058, +0.285] | 0.155 | 23 |
-| ask_recall | R4 | R1 | +0.113 [-0.062, +0.280] | 0.147 | 28 |
-| hallucinated_rate | R4 | R1 | -0.044 [-0.099, +0.011] | – | 29 |
-| ask_recall | R5 | R4 | +0.014 [-0.129, +0.161] | – | 28 |
-| citation_accuracy | R5 | R4 | -0.008 [-0.149, +0.133] | 0.953 | 25 |
-| hallucinated_rate | R1 | R0 | **-0.933 [-0.980, -0.881]** | 5.5e-07 | 29 |
+| citation_accuracy | R4 | R1 | +0.114 [-0.007, +0.241] | 0.071 | 60 |
+| ask_recall | R4 | R1 | **+0.181 [+0.073, +0.285]** | 0.002 | 84 |
+| hallucinated_rate | R4 | R1 | -0.011 [-0.042, +0.010] | – | 87 |
+| claim_support | R4 | R1 | +0.011 [-0.035, +0.068] | 0.960 | 60 |
+| correct_abstention | R4 | R1 | +0.000 [+0.000, +0.000] | – | 10 |
+| false_citation | R4 | R1 | +0.000 [+0.000, +0.000] | – | 10 |
+| citation_accuracy | R5 | R4 | +0.020 [-0.042, +0.085] | 0.600 | 72 |
+| ask_recall | R5 | R4 | +0.035 [-0.026, +0.100] | 0.199 | 84 |
+| correct_abstention | R5 | R4 | +0.000 [+0.000, +0.000] | – | 10 |
+| hallucinated_rate | R1 | R0 | **-0.976 [-0.996, -0.948]** | 1.6e-19 | 87 |

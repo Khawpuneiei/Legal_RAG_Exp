@@ -4,7 +4,7 @@
 
 ## Answer to RQ3 in one paragraph
 
-Yes. A stronger retrieval pipeline beats naive RAG by a wide margin on our use case. On the synthetic clause library, nDCG@10 rises from 0.19 (R1) to 0.51 with hybrid search plus a reranker (R4). It reaches 0.54 with contextual enrichment (R5), which also lifts Recall@5 from 0.36 to 0.49. On public data, the single biggest and most consistent lever is **contextual enrichment**: summary-augmented chunks roughly double LegalBench-RAG recall at an equal budget (0.35 → 0.63) and triple precision@1. **Reranking** helps on all three datasets. **Hybrid BM25** helps on our conversational requests but *hurts* on LegalBench-RAG. **Swapping the embedder** (R4e) helps a little: significant only on LegalBench-RAG. **LLM query rewriting** with a local 7B model (R4q) does not help and is significantly worse on two of three datasets. Clause-graph expansion with **A\*** makes the evidence set almost self-contained (definition coverage rises from 0.33 to 0.97 at the same token budget) without a significant loss of the requested clauses. It does not beat plain BFS on definition coverage, as we had hypothesised. The generation eval below shows what this means for grounding.
+Yes. A stronger retrieval pipeline beats naive RAG by a wide margin on our use case. On the synthetic clause library, nDCG@10 rises from 0.19 (R1) to 0.51 with hybrid search plus a reranker (R4). It reaches 0.54 with contextual enrichment (R5), which also lifts Recall@5 from 0.36 to 0.49. On public data, the single biggest and most consistent lever is **contextual enrichment**: summary-augmented chunks roughly double LegalBench-RAG recall at an equal budget (0.35 → 0.63) and triple precision@1. **Reranking** helps on all three datasets. **Hybrid BM25** helps on our conversational requests but *hurts* on LegalBench-RAG. **Swapping the embedder** (R4e) helps a little: significant only on LegalBench-RAG. **LLM query rewriting** with a local 7B model (R4q) does not help and is significantly worse on two of three datasets. Clause-graph expansion with **A\*** makes the evidence set almost self-contained (definition coverage rises from 0.33 to 0.97 at the same token budget) without a significant loss of the requested clauses. It does not beat plain BFS on definition coverage, as we had hypothesised. In generation, on all 90 test requests, R4 lets the 7B drafter satisfy significantly more of the requested asks than naive RAG (ask recall 0.52 vs 0.34), with a sixth of the context. Its gains in citation accuracy and hallucination rate are not significant. Every retrieval condition correctly declines all of the 10 unsupported asks.
 
 Every claim below is backed by a paired test in [`eval/results/exp3/significance.md`](../eval/results/exp3/significance.md). "Significant" means the 95% paired bootstrap CI of the difference excludes zero.
 
@@ -95,19 +95,43 @@ Scored with the paper's protocol (appendix C.5/F.1): unjudged pairs ignored, lin
   - "R6c expands fewer nodes than R6a and R6b": **partly true**. A\* expands 26 nodes against PageRank's 129, but BFS's 19 is fewer.
 - **The tuned heuristic is inadmissible and better.** λ = 0 and μ = 2, chosen on the dev split, add +0.111 cross-reference completeness [+0.023, +0.198] over the admissible setting. This agrees with Distance-Indexed Neural A\* (README 2.2): when hard structure bounds the search, admissibility buys nothing in practice.
 
-### Generation and grounding (30 held-out requests × 3 seeds, qwen2.5:7b)
+### Generation and grounding (all 90 held-out requests × 3 seeds, qwen2.5:7b)
 
 | Condition | Clauses shown | Citation accuracy | Ask recall | Hallucinated-clause rate | Claim support (verbatim quote) |
 |---|---|---|---|---|---|
-| R0 no retrieval | 0 | – | 0.000 | **0.989** | – |
-| R1 naive RAG | 32.1 | 0.475 [0.312, 0.637] | 0.397 [0.250, 0.542] | 0.055 [0.015, 0.106] | 0.937 |
-| R4 hybrid + reranker | 5 | **0.576** [0.416, 0.733] | 0.510 [0.367, 0.659] | **0.011** [0.000, 0.033] | 0.948 |
-| R5 + contextual chunks | 5 | 0.548 [0.385, 0.700] | **0.524** [0.375, 0.667] | 0.017 [0.000, 0.050] | 0.939 |
+| R0 no retrieval | 0 | – | 0.000 | 0.995 [0.986, 1.000] | – |
+| R1 naive RAG | 31.3 | 0.493 [0.386, 0.599] | 0.340 [0.256, 0.430] | 0.019 [0.002, 0.046] | 0.955 [0.914, 0.987] |
+| R4 hybrid + reranker | 5 | **0.617** [0.533, 0.703] | 0.521 [0.431, 0.611] | 0.008 [0.000, 0.019] | 0.969 [0.946, 0.989] |
+| R5 + contextual chunks | 5 | 0.606 [0.512, 0.694] | **0.556** [0.466, 0.643] | **0.006** [0.000, 0.015] | **0.971** [0.945, 0.992] |
 
-- **Retrieval is what makes citation possible at all.** Without the library (R0), essentially every clause the model writes is untraceable to an approved clause (0.99). With any retrieval the rate falls below 6%, a difference of −0.93 [−0.98, −0.88].
-- **Better retrieval helps, but this sample is too small to prove it.** R4 vs R1: citation accuracy +0.114 [−0.058, +0.285], ask recall +0.113 [−0.062, +0.280], hallucinated-clause rate −0.044 [−0.099, +0.011]. All point in the expected direction, with R4 using one sixth of R1's context. None is significant at n = 30. The full 90-request test split would be needed (about 3 hours locally).
-- **When the model cites, it quotes faithfully.** About 94% of citations carry a verbatim quote of 8 or more words from the cited clause. The errors are about *which* clause, not misquoting.
-- **The abstention metric is too lenient.** It was 1.0 everywhere: every request with an unsupported ask had at least one requirement left unmatched. It cannot tell whether the model abstained on the *right* requirement. A per-requirement alignment, or human review, is needed before using it in the report.
+Unsupported asks, per requirement (the 10 test requests that contain one, × 3 seeds). Each row's four outcomes sum to 1:
+
+| Condition | Correct abstention | False citation | Drafted a clause instead | Omitted the ask | Old item-level metric (lenient) |
+|---|---|---|---|---|---|
+| R0 no retrieval | 0.00 | 0.00 | 1.00 | 0.00 | 1.00 |
+| R1 naive RAG | **1.00** | 0.00 | 0.00 | 0.00 | 1.00 |
+| R4 hybrid + reranker | **1.00** | 0.00 | 0.00 | 0.00 | 1.00 |
+| R5 + contextual chunks | **1.00** | 0.00 | 0.00 | 0.00 | 1.00 |
+
+- **Retrieval is what makes citation possible at all.** Without the library (R0), essentially every clause the model writes is untraceable to an approved clause (0.995). Naive RAG brings this down to 0.019, a difference of −0.976 [−0.996, −0.948].
+- **R4 vs R1 on the full split: only ask recall is significant.**
+  - **Ask recall: +0.181 [+0.073, +0.285], Wilcoxon p = 0.002 (n = 84 requests with a supported ask).** With hybrid search and the reranker, the drafter satisfies about half of the requested asks instead of a third, using one sixth of naive RAG's context (5 clauses vs 31).
+  - Citation accuracy: +0.114 [−0.007, +0.241], p = 0.071 (n = 60 requests where both conditions cite something). It points the same way, but the CI still includes zero.
+  - Hallucinated-clause rate: −0.011 [−0.042, +0.010]. Not significant; both conditions are near zero.
+  - Claim support: +0.011 [−0.035, +0.068]. Not significant; both conditions are near 1.
+  - Correct abstention and false citation: identical (1.00 and 0.00 in both).
+- **Contextual enrichment (R5 vs R4) adds nothing significant at generation time.** Ask recall +0.035 [−0.026, +0.100], citation accuracy +0.020 [−0.042, +0.085]. R5's retrieval gain in Recall@5 does not carry through to significantly better selections with this model.
+- **A scoring fix removed an apparent hallucination gap.** Naive RAG's excerpts are headed `[clause_id: X]`, and the model often copies the label, writing `clause_id: BP-DISPUTE-SG-COURTS`. This happened in 23 of R1's 605 selections and 3 each for R4 and R5. The first scorer counted these as invented ids. They now count as the library id they name, after dropping the label, brackets and case. This lowers R1's hallucinated-clause rate from 0.047 to 0.019. The R4 − R1 difference moves from −0.037 [−0.071, −0.006], which would have been reported as significant, to −0.011 [−0.042, +0.010]. R1's ask recall (0.324 → 0.340) and citation accuracy (0.480 → 0.493) rise slightly. R4 vs R1 ask recall stays significant either way.
+- **When the model cites, it quotes faithfully.** 95–97% of citations carry a verbatim quote of 8 or more words from the cited clause. The errors are about *which* clause, not misquoting.
+- **Per-requirement abstention: every retrieval condition declines the unsupported ask, every time.**
+  - The unsupported asks are crypto custody, a Shariah undertaking, carbon credits, an ERISA representation and an Indonesian non-compete.
+  - On all 30 request-seed pairs, R1, R4 and R5 left the unsupported requirement at null with no drafted text and never cited a clause for it (0 false citations).
+  - R0, which is told to draft, writes a clause for every one.
+  - The old item-level metric's 1.0 was therefore right here, but it could not check *which* requirement was left null.
+- **The alignment behind the abstention metric was checked by hand.**
+  - All 120 unsupported-ask alignments (10 requests × 3 seeds × 4 conditions) match the model's own requirement line for that ask. The matched line scores at least 0.50 on the alignment's similarity scale, against at most 0.31 for any other line in the same output.
+  - As a cross-check, take the selections that correctly cite the gold clause of exactly one ask. The alignment assigns 92–94% of them to that same ask, and only 1 of 652 to a different ask: a near tie where the model's own label and its citation disagree. The rest stay unaligned because their paraphrase is too loose for word overlap; this affects no abstention outcome.
+- **The abstention test is too easy to separate the conditions.** It has 10 requests, and its 5 unsupported topics are far from anything in the library, so every retrieval condition is at ceiling. No difference between R1, R4 and R5 can show up, and none is claimed. The test says nothing yet about near misses, where a false citation is most likely: for example, a 24-month non-solicit when the library has only 6- and 12-month versions.
 
 ## What this means for the prototype
 
@@ -116,7 +140,7 @@ Scored with the paper's protocol (appendix C.5/F.1): unjudged pairs ignored, lin
 3. **Embedder:** Qwen3-Embedding-0.6B is at least as good as BGE-M3 everywhere and significantly better on LegalBench-RAG. Switching is low-risk, but the gain is small next to the reranker and contextual chunks.
 4. **Drop the doctrinal query rewrite** (R4q) unless a stronger model is approved. With a local 7B model it hurt on two datasets.
 5. **Next condition to add:** an LLM reranker. ACORD shows GPT-4o-class reranking far ahead of any cross-encoder (nDCG@10 about 0.80 vs 0.58–0.61 here).
-6. **Before the report:** run the generation eval on all 90 test requests, add a per-requirement abstention check, and have a second person label a sample of requests (plan section 6.1, inter-annotator agreement).
+6. **Before the report:** have a second person label a sample of requests (plan section 6.1, inter-annotator agreement). Also add harder unsupported asks: near misses of library clauses rather than unrelated topics. The current 10 are at ceiling for every retrieval condition, so they cannot show whether the drafter abstains when a tempting but wrong clause is in context.
 
 ## Reproducing
 
@@ -173,12 +197,13 @@ R0 (no retrieval) has no retrieval metrics. It appears only in the generation an
   - ACORD star-precision@5.
   - Tokens retrieved.
 - **Graph (R6):** clause recall, definition coverage, cross-reference completeness, legal-requirement satisfaction, evidence tokens, nodes expanded and wall time.
-- **Generation and grounding** (30 test requests × 3 seeds, qwen2.5:7b, temperature 0.3):
-  - citation accuracy;
-  - hallucinated-clause rate;
+- **Generation and grounding** (all 90 test requests × 3 seeds, qwen2.5:7b, temperature 0.3). The model returns one selection per requirement it sees in the request: a short requirement description, a `clause_id` (or null) and an evidence quote.
+  - citation accuracy: share of cited ids that are a gold clause of one of the request's asks;
+  - hallucinated-clause rate: share of selections not traceable to the library (an id that is not in the library, or drafted text with no id). An id counts as a library id if it matches one after dropping a copied `clause_id:` label, brackets and case;
   - claim support: the model's evidence quote of 8 or more words must appear verbatim in the cited clause;
-  - ask recall;
-  - abstention on unsupported asks.
+  - ask recall: share of the request's asks satisfied by a correct citation;
+  - **per-requirement abstention** (the 10 requests with an unsupported ask). Each selection is aligned one-to-one to the request's asks and unsupported asks by the words of its requirement description. The alignment uses IDF-weighted word overlap with the ask phrasings in `scripts/clause_catalog.py` (`ASKS`, `MISSING_ASKS`) and an optimal assignment, and never looks at which clause was cited. The unsupported ask then has one of four outcomes: **correct abstention** (its selection has a null id and no drafted text), **false citation** (its selection cites some clause), drafted (null id, but a drafted clause instead), or omitted (no selection matches it);
+  - lenient abstention, the earlier item-level metric, kept for comparison: the request has *any* null selection, whichever requirement it was on.
 
   All are computed deterministically, with no LLM judge.
 - **Uncertainty:** 95% bootstrap confidence intervals over queries (2,000 resamples).
@@ -189,4 +214,6 @@ R0 (no retrieval) has no retrieval metrics. It appears only in the generation an
 - Every LLM step uses one local 7B model (qwen2.5:7b, 4-bit). A stronger API model would probably write better contexts, rewrites and drafts. The plan's second model family and an LLM judge were not used.
 - The commercial-embedder arm of R4e was not run, because no Voyage or Isaacus key is available and spending on the OpenAI key was not authorised.
 - R5 on LegalBench-RAG summarises only the head and tail of long documents (12,000 + 2,000 characters), because the local model's context is limited.
+- The generation metrics score the model's selections, not finished drafts. The per-requirement alignment uses word overlap with the catalogue's ask phrasings. It was checked by hand only for the unsupported asks.
+- The abstention test is small (10 requests, 5 distinct unsupported topics) and easy, because each topic is far from the library. It is at ceiling for every retrieval condition.
 - Experiments 1 (skill files) and 2 (agent harness) are not part of this run.
