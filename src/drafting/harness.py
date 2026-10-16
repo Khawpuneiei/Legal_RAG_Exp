@@ -19,8 +19,12 @@ from src.agreement.validation import check_request, check_selections, guard_rout
 from src.drafting import skills as sk
 from src.drafting.assembly import astar_assign, rule_requirements
 from src.drafting.schema import OUTPUT_CONTRACT, extract_json, implicit_unsupported, parse_draft
+from typing import TYPE_CHECKING
+
 from src.llm.ollama import OllamaLLM
-from src.retrieval.service import ClauseSearch
+
+if TYPE_CHECKING:  # heavy (torch); only the experiments need it
+    from src.retrieval.service import ClauseSearch
 
 SYSTEM = ("You are a legal drafting assistant at a Singapore fund management company regulated by the Monetary "
           "Authority of Singapore. Accuracy matters more than completeness.")
@@ -34,7 +38,7 @@ STRUCTURAL = {"missing_field", "date_conflict", "out_of_range", "governing_law",
 @dataclass
 class Ctx:
     lib: Library
-    search: ClauseSearch
+    search: "ClauseSearch"
     llm: OllamaLLM
     seed: int
     temperature: float = 0.3

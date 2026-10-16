@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, route_badge %}
+{% block title %}Review queue · Legal Agreement AI{% endblock %}
+{% block content %}
+<h1>Review queue</h1>
+<div class="chips">
+  <a href="/queue">All</a><a href="/queue?status=IN_REVIEW">In review</a><a href="/queue?status=ESCALATED">Escalated</a>
+  <a href="/queue?status=RETURNED">Returned</a><a href="/queue?status=APPROVED">Approved</a><a href="/queue?status=REJECTED">Rejected</a>
+</div>
+<div class="card table-wrap">
+  <table>
+    <thead><tr><th>Ref</th><th>Submitted</th><th>Requester</th><th>Type</th><th>Counterparty</th><th>Status</th><th>Route</th><th class="num">Issues</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr><td><a href="/requests/{{ r.id }}">{{ r.ref }}</a></td><td class="small">{{ r.created_at[:16] | replace('T', ' ') }}</td><td>{{ r.requester }}</td><td>{{ r.agreement_type }}</td><td>{{ r.counterparty or '–' }}</td><td>{{ status_badge(r.status) }}</td><td>{{ route_badge(r.route) }}</td><td class="num">{{ r.n_issues if r.n_issues is not none else '–' }}</td></tr>
+    {% else %}
+      <tr><td colspan="8" class="muted">Nothing here.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

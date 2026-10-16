@@ -34,7 +34,7 @@ def astar_assign(lib: Library, candidates: list[list[dict]], tau: float) -> tupl
     n = len(candidates)
     opts: list[list[tuple[float, str | None]]] = []
     for cands in candidates:
-        o = [((1.0 - calibrated(c["score"])) + W_DEV * c["deviation_cost"], c["clause_id"]) for c in cands]
+        o = [((1.0 - (c["relevance"] if "relevance" in c else calibrated(c["score"]))) + W_DEV * c["deviation_cost"], c["clause_id"]) for c in cands]
         o.append((tau, None))
         opts.append(sorted(o, key=lambda x: x[0]))
     min_cost = [o[0][0] for o in opts]
@@ -59,7 +59,7 @@ def astar_assign(lib: Library, candidates: list[list[dict]], tau: float) -> tupl
     return [None] * n, expanded
 
 
-BODY = re.compile(r"Could you prepare|We are discussing|We won a discretionary|Please draft the IMA|wants to distribute|"
+BODY = re.compile(r"Could you prepare|[Pp]lease (prepare|draft)|need (an?|the) [A-Za-z ]*(agreement|NDA|letter)|We are discussing|We won a discretionary|Please draft the IMA|wants to distribute|"
                   r"Can we get a distribution|is committing US|New subscription from|Please prepare the subscription|"
                   r"It should take effect", re.I)
 CLOSER = re.compile(r"^(Thanks|Many thanks|Appreciate it|Cheers)|\((Sales|Ops|IR|Distribution|PM team|Product)\)$", re.I)

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Scoreboard · Legal Agreement AI{% endblock %}
+{% block content %}
+<h1>Scoreboard</h1>
+<p class="muted">Every experimental condition on the same frozen test set (90 synthetic requests, 3 seeds, local qwen2.5:7b via Ollama). Means over requests. Full tables with 95% bootstrap CIs and paired tests are in <code>eval/results/</code> and the README.</p>
+
+<h2>Experiment 1 — does a SKILL.md playbook beat a vanilla LLM?</h2>
+{% set conds, table = exp1 %}
+{% if conds %}
+<div class="card table-wrap"><table>
+  <thead><tr><th>Condition</th>{% for m in e1m %}<th class="num">{{ m | replace('_', ' ') }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for c in conds %}<tr><td><code>{{ c }}</code></td>{% for m in e1m %}<td class="num">{{ fmt(table[c].get(m), m != 'total_tokens') }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+<p class="small muted">S0 vanilla · S1 skill content as a long system prompt · S2 focused SKILL.md (model loads ≤ 3 files) · S3 comprehensive SKILL.md · S4 skill written by the model · S5 S2 on qwen2.5:3b · S0s S0 on qwen2.5:3b.</p>
+<img class="fig" src="/results/exp1/scoreboard.png" alt="Experiment 1 scoreboard chart">
+{% else %}<div class="alert info">Experiment 1 results are not available in this build yet.</div>{% endif %}
+
+<h2>Experiment 2 — does an agent harness beat a single LLM call?</h2>
+{% set conds, table = exp2 %}
+{% if conds %}
+<div class="card table-wrap"><table>
+  <thead><tr><th>Condition</th>{% for m in e2m %}<th class="num">{{ m | replace('_', ' ') }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for c in conds %}<tr><td><code>{{ c }}</code></td>{% for m in e2m %}<td class="num">{{ fmt(table[c].get(m), m not in ('total_tokens', 'latency_s')) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+<p class="small muted">H-det rules + retrieval, no LLM · H0 single call · H1 fixed pipeline · H2 ReAct agent with tools · H3 H2 + validation/reflection loop · H4 H3 + compliance-checker and router agents + human-review interrupt · H3b LLM extracts requests, A* assembles clauses.</p>
+<div class="grid g2">
+  <img class="fig" src="/results/exp2/scoreboard.png" alt="Experiment 2 scoreboard chart">
+  <img class="fig" src="/results/exp2/cost_vs_quality.png" alt="Experiment 2 cost versus quality">
+</div>
+{% else %}<div class="alert info">Experiment 2 results are not available in this build yet.</div>{% endif %}
+
+<h2>Experiment 3 — does a stronger retrieval pipeline help?</h2>
+<div class="card table-wrap"><table>
+  <thead><tr><th>Benchmark · metric</th>{% for c in ['R1', 'R2', 'R3', 'R4', 'R4e', 'R4q', 'R5'] %}<th class="num">{{ c }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for key, label in [(('synthetic', 'ndcg@10'), 'Synthetic library · nDCG@10'), (('synthetic', 'recall@5'), 'Synthetic library · Recall@5'), (('acord-test', 'ndcg@10'), 'ACORD · nDCG@10'), (('lbr-mini', 'char_r@8kchars'), 'LegalBench-RAG-mini · recall @ 8k chars')] %}
+    <tr><td>{{ label }}</td>{% for c in ['R1', 'R2', 'R3', 'R4', 'R4e', 'R4q', 'R5'] %}<td class="num">{{ '%.3f' % exp3[key][c] if exp3.get(key) and c in exp3[key] else '–' }}</td>{% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% set gconds, gtable = gen %}
+{% if gconds %}
+<div class="card table-wrap"><table>
+  <thead><tr><th>Grounding eval</th>{% for c in gconds %}<th class="num">{{ c }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for m in ['hallucinated_rate', 'citation_accuracy', 'ask_recall'] %}<tr><td>{{ m | replace('_', ' ') }}</td>{% for c in gconds %}<td class="num">{{ fmt(gtable[c].get(m)) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+<div class="grid g2">
+  <img class="fig" src="/results/exp3/generation_grounding.png" alt="Grounding by retrieval condition">
+  <img class="fig" src="/results/exp3/synthetic_graph.png" alt="Graph expansion at equal budget">
+</div>
+{% if judge %}<h2>LLM judge (reviewer notes)</h2><div class="card"><pre class="small">{{ judge }}</pre></div>{% endif %}
+{% endblock %}

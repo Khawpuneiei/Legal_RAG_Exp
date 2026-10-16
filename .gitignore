@@ -20,3 +20,8 @@ data/public/
 Thumbs.db
 .vscode/
 .idea/
+
+# Vercel / local deploy state
+.vercel
+
+.vercel

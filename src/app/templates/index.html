@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, route_badge %}
+{% block content %}
+<h1>AI-assisted agreement drafting, with Legal in control</h1>
+<p class="muted">Staff submit a structured request. The system picks the approved template, fills the fields, matches each special request to an approved clause, checks the request against the drafting policy and routes the draft to the right reviewer. Nothing is executed without human approval, and every step is written to a tamper-evident audit trail.</p>
+
+<div class="flow">
+  <span class="step det">Request form</span>→<span class="step det">PII guard</span>→<span class="step det">Template router</span>→<span class="step det">Field populator</span>→<span class="step {{ 'llm' if mode != 'rules' else 'det' }}">Clause retrieval + A* assembly</span>→<span class="step det">Validation engine</span>→<span class="step det">Routing policy</span>→<span class="step human">Legal / Senior Legal review</span>→<span class="step det">Audit trail</span>
+</div>
+<p class="small muted">Grey: deterministic code. Blue: model-assisted. Orange: human checkpoint. This deployment runs in <code>{{ mode }}</code> mode{% if mode == 'rules' %} (no LLM: the best no-cost configuration from Experiment 2){% endif %}.</p>
+
+{% if store_error %}<div class="alert bad">The workflow store is not reachable: {{ store_error }}</div>{% endif %}
+
+<div class="grid g4">
+  <div class="card kpi"><div class="v">{{ stats.get('requests', 0) }}</div><div class="l">requests</div></div>
+  <div class="card kpi"><div class="v">{{ (stats.get('by_status') or {}).get('IN_REVIEW', 0) + (stats.get('by_status') or {}).get('ESCALATED', 0) }}</div><div class="l">awaiting Legal</div></div>
+  <div class="card kpi"><div class="v">{{ stats.get('audit_events', 0) }}</div><div class="l">audit events</div></div>
+  <div class="card kpi"><div class="v">{{ stats.get('clauses_indexed') if stats.get('clauses_indexed') is not none else '129' }}</div><div class="l">approved clauses indexed</div></div>
+</div>
+
+<h2>Try it</h2>
+<p>Open a sample request (each one exercises a different check), or write your own.</p>
+<div class="chips">
+  {% for rid, label in samples %}<a href="/requests/new?sample={{ rid }}">{{ label }}</a>{% endfor %}
+  <a href="/requests/new">Blank request</a>
+</div>
+
+<h2>Recent requests</h2>
+<div class="card table-wrap">
+  <table>
+    <thead><tr><th>Ref</th><th>Type</th><th>Counterparty</th><th>Status</th><th>Route</th><th class="num">Issues</th></tr></thead>
+    <tbody>
+    {% for r in recent %}
+      <tr><td><a href="/requests/{{ r.id }}">{{ r.ref }}</a></td><td>{{ r.agreement_type }}</td><td>{{ r.counterparty or '–' }}</td><td>{{ status_badge(r.status) }}</td><td>{{ route_badge(r.route) }}</td><td class="num">{{ r.n_issues if r.n_issues is not none else '–' }}</td></tr>
+    {% else %}
+      <tr><td colspan="6" class="muted">No requests yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

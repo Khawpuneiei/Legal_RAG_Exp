@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Architecture · Legal Agreement AI{% endblock %}
+{% block content %}
+<h1>Architecture</h1>
+<p class="muted">One codebase, two deployment targets. The free demo and the production platform run the same application image logic, the same SQL migrations and the same drafting engine; only the infrastructure adapters change. Details and decision records: <code>docs/architecture.md</code>.</p>
+
+<img class="fig" src="/docs/figures/production-architecture.svg" alt="Production architecture diagram">
+
+<div class="grid g2">
+  <div class="card">
+    <h2>This demo (free tier)</h2>
+    <table><tbody>
+      <tr><td>App</td><td>FastAPI on Vercel (Python 3.12, Fluid Compute), region Singapore</td></tr>
+      <tr><td>Workflow state + audit</td><td>Supabase Postgres 17 (ap-southeast-1): <code>api_*</code> SQL functions, RLS, hash-chained audit</td></tr>
+      <tr><td>Clause search</td><td>Supabase Edge Function: gte-small embeddings + hybrid full-text / pgvector search (RRF)</td></tr>
+      <tr><td>Drafting</td><td><code>{{ mode }}</code> mode: rules + A* clause assembly, no LLM cost</td></tr>
+      <tr><td>Delivery</td><td>GitHub Actions (tests, Postgres integration tests, eval gate) → Vercel deploys</td></tr>
+      <tr><td>Secrets</td><td>None in the app: only the publishable key; writes go through checked SQL functions</td></tr>
+    </tbody></table>
+  </div>
+  <div class="card">
+    <h2>Production (Kubernetes)</h2>
+    <table><tbody>
+      <tr><td>App</td><td>API pods (gunicorn + uvicorn), HPA, PDB, NetworkPolicies, Entra ID OIDC at the ingress</td></tr>
+      <tr><td>Workers</td><td>Queue workers claim drafting jobs from Postgres (SKIP LOCKED), autoscaled on queue depth</td></tr>
+      <tr><td>Data</td><td>Managed PostgreSQL + pgvector (same migrations), PITR backups, WORM export of the audit chain</td></tr>
+      <tr><td>Models</td><td>TEI (gte-small) for embeddings; LLM via LiteLLM gateway (Azure OpenAI Data Zone APAC or self-hosted vLLM)</td></tr>
+      <tr><td>Observability</td><td>OpenTelemetry → Prometheus/Grafana; Langfuse for LLM traces; structured JSON logs</td></tr>
+      <tr><td>Delivery</td><td>Helm chart, Terraform (Azure), staged releases gated by the scoreboard</td></tr>
+    </tbody></table>
+  </div>
+</div>
+{% endblock %}

@@ -4,6 +4,7 @@
 #   OLLAMA_HOST=127.0.0.1:11435 OLLAMA_NUM_PARALLEL=4 OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 ollama serve
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export RERANK_BATCH=${RERANK_BATCH:-8}  # small reranker batches so the reranker (fp16, ~1.3 GB) fits next to the LLM on an 8 GB GPU
 export OLLAMA_HOST=${OLLAMA_HOST:-http://127.0.0.1:11435}
 PY=${PY:-.venv/Scripts/python.exe}
 echo "start $(date)"

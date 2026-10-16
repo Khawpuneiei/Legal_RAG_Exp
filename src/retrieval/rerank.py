@@ -10,10 +10,11 @@ from src.common import JsonCache, stable_hash
 
 
 class Reranker:
-    def __init__(self, name: str = "BAAI/bge-reranker-v2-m3", max_length: int = 512, batch_size: int = 32):
+    def __init__(self, name: str = "BAAI/bge-reranker-v2-m3", max_length: int = 512, batch_size: int | None = None):
         self.name = name
         self.max_length = max_length
-        self.batch_size = batch_size
+        import os
+        self.batch_size = batch_size or int(os.environ.get("RERANK_BATCH", "32"))
         self._model = None
         self.cache = JsonCache("rerank-" + name.replace("/", "_"))
 
@@ -31,6 +32,8 @@ class Reranker:
             return hit
         scores = self.model.predict([(query, t) for t in texts], batch_size=self.batch_size, show_progress_bar=False)
         scores = [float(s) for s in scores]
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()  # give the memory back: the local LLM shares this GPU
         self.cache.put(key, scores)
         return scores
 
