@@ -1,0 +1,65 @@
+{
+  "base": "https://legal-agreement-ai.vercel.app",
+  "requests": 150,
+  "concurrency": 10,
+  "wall_s": 4.7,
+  "throughput_rps": 31.81,
+  "by_endpoint": {
+    "GET /": {
+      "n": 21,
+      "status_codes": {
+        "200": 21
+      },
+      "errors": 0,
+      "non_2xx": 0,
+      "p50_ms": 98,
+      "p95_ms": 246,
+      "max_ms": 272
+    },
+    "GET /api/v1/requests": {
+      "n": 22,
+      "status_codes": {
+        "200": 22
+      },
+      "errors": 0,
+      "non_2xx": 0,
+      "p50_ms": 60,
+      "p95_ms": 128,
+      "max_ms": 193
+    },
+    "GET /queue": {
+      "n": 30,
+      "status_codes": {
+        "200": 30
+      },
+      "errors": 0,
+      "non_2xx": 0,
+      "p50_ms": 75,
+      "p95_ms": 165,
+      "max_ms": 184
+    },
+    "GET /scoreboard": {
+      "n": 27,
+      "status_codes": {
+        "200": 27
+      },
+      "errors": 0,
+      "non_2xx": 0,
+      "p50_ms": 21,
+      "p95_ms": 87,
+      "max_ms": 106
+    },
+    "POST /api/v1/draft/preview": {
+      "n": 50,
+      "status_codes": {
+        "200": 45,
+        "429": 5
+      },
+      "errors": 0,
+      "non_2xx": 5,
+      "p50_ms": 474,
+      "p95_ms": 1431,
+      "max_ms": 1955
+    }
+  }
+}
