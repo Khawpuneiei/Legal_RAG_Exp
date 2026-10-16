@@ -144,9 +144,9 @@ def run_graph(ds: Dataset, cfg: dict, r5: dict, res: Resources, rows: list, want
 
 
 SUMMARY_METRICS = {
-    "synthetic": ["recall@1", "recall@3", "recall@5", "recall@10", "mrr", "ndcg@10", "char_p@5", "char_r@5", "tokens@5"],
-    "acord-test": ["ndcg@5", "ndcg@10", "p@5_4star", "p@5_5star", "mrr", "recall@10"],
-    "lbr-mini": ["char_p@1", "char_r@1", "char_p@4", "char_r@4", "char_p@16", "char_r@16", "char_r@64"],
+    "synthetic": ["recall@1", "recall@3", "recall@5", "recall@10", "mrr", "ndcg@10", "char_p@5", "char_r@5", "char_r@8kchars", "tokens@5"],
+    "acord-test": ["ndcg@5", "ndcg@10", "p@5_3star", "p@5_4star", "p@5_5star", "mrr", "recall@10"],
+    "lbr-mini": ["char_p@1", "char_r@1", "char_p@4", "char_r@4", "char_r@16", "char_r@64", "char_p@8kchars", "char_r@8kchars"],
     "synthetic-graph": ["clause_recall", "definition_coverage", "xref_completeness", "requires_satisfied", "evidence_tokens", "nodes_expanded", "ms"],
 }
 
@@ -235,12 +235,16 @@ def main() -> None:
         print("Stage 3: clause-graph expansion")
         run_graph(datasets["synthetic"], cfg, r5, res, rows, graph_wanted)
 
-    with open(OUT / "per_query.jsonl", "w", encoding="utf-8") as f:
-        for r in rows:
-            f.write(json.dumps(r) + "\n")
-    with open(OUT / "rankings.jsonl", "w", encoding="utf-8") as f:
-        for r in rank_rows:
-            f.write(json.dumps(r) + "\n")
+    # Merge with earlier results for datasets that were not re-run in this invocation.
+    rerun = set(datasets) | ({"synthetic-graph"} if "synthetic" in datasets else set())
+    for fname, new in (("per_query.jsonl", rows), ("rankings.jsonl", rank_rows)):
+        path = OUT / fname
+        kept = [r for r in read_jsonl(path) if r["dataset"] not in rerun] if path.exists() else []
+        if fname == "per_query.jsonl":
+            rows = kept + new
+        with open(path, "w", encoding="utf-8") as f:
+            for r in kept + new:
+                f.write(json.dumps(r) + "\n")
     summary = summarize(rows)
     with open(OUT / "summary.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(summary[0]))

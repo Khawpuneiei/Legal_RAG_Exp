@@ -4,7 +4,11 @@
   A chunk covers a clause if it overlaps at least half of the clause's characters.
 * Character level (LegalBench-RAG): precision and recall of retrieved characters against gold spans,
   computed exactly as legalbenchrag/run_benchmark.py does.
-* ACORD: nDCG@5/10 with graded gains and star-precision@5 (share of top-5 clauses rated >= 4 or 5 stars).
+* ACORD, following the paper's protocol (Wang et al. 2025, appendix C.5 and F.1): query-clause pairs
+  missing from the qrels are ignored during evaluation (removed from the ranking), nDCG uses linear
+  gains as in pytrec_eval, and k-star precision@5 counts top-5 clauses rated >= k stars divided by
+  min(5, number of clauses rated >= k for that query).
+nDCG uses linear gains (rel / log2(rank + 1)) on every dataset.
 """
 from __future__ import annotations
 
@@ -49,8 +53,8 @@ def dcg(gains: list[float]) -> float:
 
 
 def ndcg_at(units: list[str], graded: dict[str, int], k: int) -> float:
-    gains = [2 ** graded.get(u, 0) - 1 for u in units[:k]]
-    ideal = sorted((2 ** g - 1 for g in graded.values()), reverse=True)[:k]
+    gains = [graded.get(u, 0) for u in units[:k]]
+    ideal = sorted(graded.values(), reverse=True)[:k]
     idcg = dcg(ideal)
     return dcg(gains) / idcg if idcg > 0 else float("nan")
 
@@ -72,6 +76,10 @@ def query_metrics(ds: Dataset, q, ranked_chunks: list[int], chunks: list[Chunk],
         m[f"tokens@{k}"] = sum(len(chunks[i].text) for i in ranked_chunks[:k]) / 4
     if covers is not None and q.graded:
         units, ranks = unit_ranking(ranked_chunks, covers)
+        if ds.meta.get("judged_only"):
+            # ACORD: unjudged clauses are ignored, i.e. removed from the ranking (ranks renumbered)
+            units = [u for u in units if u in q.graded]
+            ranks = list(range(1, len(units) + 1))
         rel = {u for u, g in q.graded.items() if g >= ds.relevant_grade}
         if rel:
             for k in ks:
@@ -83,13 +91,27 @@ def query_metrics(ds: Dataset, q, ranked_chunks: list[int], chunks: list[Chunk],
             m["ndcg@5"] = ndcg_at(units, q.graded, 5)
             top5 = units[:5]
             if ds.name.startswith("acord"):
-                m["p@5_4star"] = sum(1 for u in top5 if q.graded.get(u, 0) >= 3) / 5
-                m["p@5_5star"] = sum(1 for u in top5 if q.graded.get(u, 0) >= 4) / 5
+                for stars, thr in (("3star", 2), ("4star", 3), ("5star", 4)):
+                    viable = sum(1 for g in q.graded.values() if g >= thr)
+                    hits = sum(1 for u in top5 if q.graded.get(u, 0) >= thr)
+                    m[f"p@5_{stars}"] = hits / min(5, viable) if viable else float("nan")
     if q.spans:
         for k in char_ks:
             p, r = char_pr(ranked_chunks, chunks, q.spans, k)
             m[f"char_p@{k}"] = p
             m[f"char_r@{k}"] = r
+        # Equal-budget comparison across chunk sizes: take chunks in rank order while the total stays
+        # within 8,000 characters (~2,000 tokens), e.g. 4 fixed 2,000-char chunks or ~16 500-char chunks.
+        used, n = 0, 0
+        for i in ranked_chunks:
+            size = chunks[i].end - chunks[i].start
+            if used + size > 8000:
+                break
+            used += size
+            n += 1
+        p, r = char_pr(ranked_chunks, chunks, q.spans, n)
+        m["char_p@8kchars"] = p
+        m["char_r@8kchars"] = r
     return m
 
 

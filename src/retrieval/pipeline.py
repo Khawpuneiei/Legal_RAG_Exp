@@ -41,6 +41,10 @@ class Resources:
     _queries: dict = field(default_factory=dict)
 
     def embedder(self, key: str) -> Embedder:
+        # keep only one embedding model on the GPU at a time (8 GB card)
+        for other, emb in self.embedders.items():
+            if other != key:
+                emb.unload()
         if key not in self.embedders:
             self.embedders[key] = Embedder(key)
         return self.embedders[key]
@@ -95,6 +99,7 @@ def rank(ds: Dataset, cond: Condition, res: Resources) -> dict:
     chunks = chunks_for(ds, cond, res)
     texts = texts_for(ds, cond, res)
     queries = queries_for(ds, cond, res)
+    TOP_N = ds.meta.get("top_n", 100)  # noqa: N806
     lists: list[list[int]] = []
     if cond.retriever in ("bm25", "hybrid"):
         bm = BM25Index(texts)

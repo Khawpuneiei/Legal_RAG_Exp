@@ -69,7 +69,7 @@ def graph_chart(rows):
     metrics = [("clause_recall", "Clause recall"), ("definition_coverage", "Definition coverage"), ("xref_completeness", "Cross-reference completeness")]
     if not conds:
         return
-    fig, ax = plt.subplots(figsize=(7.5, 3.8), facecolor=SURFACE)
+    fig, ax = plt.subplots(figsize=(7.5, 4.3), facecolor=SURFACE)
     style(ax)
     ax.xaxis.grid(False)
     ax.yaxis.grid(True, color=GRID, linewidth=0.8)
@@ -82,7 +82,7 @@ def graph_chart(rows):
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("Share (test split)", color=INK2)
     ax.set_title("Graph expansion at an equal 1,200-token budget (synthetic)", loc="left", color=INK, fontsize=11)
-    ax.legend(frameon=False, loc="lower right", fontsize=9, labelcolor=INK)
+    ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=9, labelcolor=INK)
     fig.tight_layout()
     fig.savefig(FIG / "synthetic_graph.png", dpi=160, facecolor=SURFACE)
     plt.close(fig)
@@ -93,7 +93,8 @@ def main():
     bars(rows, "synthetic", "ndcg@10", "Synthetic clause library: nDCG@10 by condition (90 test requests)", "nDCG@10", "synthetic_ndcg10.png")
     bars(rows, "synthetic", "recall@5", "Synthetic clause library: Recall@5 by condition", "Recall@5 (relevant clauses in top-5 chunks)", "synthetic_recall5.png")
     bars(rows, "acord-test", "ndcg@10", "ACORD test (57 queries): nDCG@10 by condition", "nDCG@10", "acord_ndcg10.png")
-    bars(rows, "lbr-mini", "char_r@16", "LegalBench-RAG-mini (776 queries): character recall@16", "Recall@16 (share of gold characters retrieved)", "lbr_recall16.png")
+    bars(rows, "lbr-mini", "char_r@8kchars", "LegalBench-RAG-mini (776 queries): recall within 8,000 retrieved characters",
+         "Share of gold characters retrieved (equal ~2,000-token budget)", "lbr_recall_8kchars.png")
     graph_chart(rows)
     print("figures in", FIG)
 

@@ -38,10 +38,20 @@ class Embedder:
         path = CACHE / "emb" / self.key / f"{stable_hash(*texts)}.npy"
         if path.exists():
             return np.load(path)
-        # sort by length for efficient batching, then restore order
+        # Sort by length and use small batches for long texts: on an 8 GB GPU, batches of 32 long
+        # inputs overflow VRAM and Windows silently falls back to (very slow) shared system memory.
         order = np.argsort([-len(t) for t in texts])
-        emb = self.model.encode([texts[i] for i in order], batch_size=self.batch_size, normalize_embeddings=True,
-                                show_progress_bar=len(texts) > 2000, convert_to_numpy=True)
+        sorted_texts = [texts[i] for i in order]
+        parts = []
+        long_ = [t for t in sorted_texts if len(t) > 1500]
+        short = sorted_texts[len(long_):]
+        for group, bs in ((long_, 4), (short, self.batch_size)):
+            if group:
+                parts.append(self.model.encode(group, batch_size=bs, normalize_embeddings=True,
+                                               show_progress_bar=False, convert_to_numpy=True))
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+        emb = np.concatenate(parts)
         out = np.empty_like(emb)
         out[order] = emb
         path.parent.mkdir(parents=True, exist_ok=True)

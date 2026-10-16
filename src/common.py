@@ -91,7 +91,10 @@ def load_acord(split: str = "test") -> Dataset:
             graded.setdefault(row[0], {})[row[1]] = int(row[2])
     queries = [Query(qid, qtext[qid], g) for qid, g in sorted(graded.items())]
     # ACORD grades: 0..4 (= 1..5 stars). 3 = 4-star (relevant, minor omissions).
-    return Dataset(f"acord-{split}", documents, queries, units, relevant_grade=3)
+    # Unjudged pairs are ignored in evaluation (paper, appendix C.5), so rankings must be deep enough
+    # to contain at least ten judged clauses: retrieve the top 1,000 instead of the top 100.
+    return Dataset(f"acord-{split}", documents, queries, units, relevant_grade=3,
+                   meta=dict(judged_only=True, top_n=1000))
 
 
 def _safe_name(rel_path: str) -> str:

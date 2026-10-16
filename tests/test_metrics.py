@@ -20,6 +20,13 @@ def test_ndcg_perfect_and_worst():
     assert ndcg_at(["zz"], graded, 10) == 0.0
 
 
+def test_ndcg_uses_linear_gains_like_pytrec_eval():
+    graded = {"a": 2, "b": 1}
+    # DCG = 1/log2(2) + 2/log2(3); IDCG = 2/log2(2) + 1/log2(3)
+    expected = (1 + 2 / math.log2(3)) / (2 + 1 / math.log2(3))
+    assert math.isclose(ndcg_at(["b", "a"], graded, 10), expected)
+
+
 def test_unit_ranking_dedupes_and_keeps_first_rank():
     covers = [["u1", "u2"], ["u2"], ["u3"]]
     units, ranks = unit_ranking([1, 0, 2], covers)
