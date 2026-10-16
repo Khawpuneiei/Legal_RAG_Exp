@@ -139,7 +139,16 @@ One codebase and one set of migrations run in three places. Only adapters change
 
 ## 6. Evidence behind the decisions
 
-The experiment results that drive ADR-2 and ADR-4 are summarised in the README ("Results by research question") and in full in `eval/results/exp1`, `exp2`, `exp3` and `deployed`. Section 6 of this document is updated with the final numbers in the commit that adds those results.
+All on the same frozen test split (90 synthetic requests), 3 seeds for LLM conditions. Full write-ups: [experiment2-results.md](experiment2-results.md), [experiment3-results.md](experiment3-results.md), [`eval/results/deployed`](../eval/results/deployed/summary.md).
+
+| Decision | Evidence |
+|---|---|
+| ADR-2 rules-first drafting; LLM optional, may only escalate | Experiment 2: rules + A* (no LLM) 0.444 task success and 0.889 routing accuracy with zero false alarms, against 0.233 / 0.504 / 97% false alarms for a single LLM call and 0.13–0.24 success for agent harnesses at 8–11× the tokens. The validation loop is the only agent component that clearly helps (routing 0.49 → 0.75). The LLM is needed for semantic checks: asks with no approved clause are caught 93–100% by the LLM and 0% by rules |
+| ADR-2 recommended LLM mode `assist` (H3b), not `agent` | H3b: 0.352 success, 0.807 routing, 0.10 false alarms with one LLM call (291 tokens); 12 successes per 10k tokens against 0.03–0.06 for the agents |
+| ADR-4 GPU retrieval profile = Experiment 3 winner | R5 (BGE-M3 hybrid + reranker + contextual chunks) leads on our clause library (nDCG@10 0.536) and LegalBench-RAG-mini; retrieval cuts the hallucinated-clause rate from 0.995 to under 0.01 |
+| ADR-4 free tier measured, not assumed | gte-small hybrid in Supabase, rules mode: 0.356 success, 0.867 routing, 0.587 ask recall, against 0.444 / 0.889 / 0.687 with the GPU profile. The gap is retrieval quality only (same rules, same policy) |
+| ADR-5 / 5.9 human oversight works as designed | Live demo and CI integration tests: escalated drafts cannot be approved by a Legal reviewer (SQL-enforced), the audit chain verifies intact, updates and deletes on `audit_events` are rejected; the H4 human-review interrupt paused and resumed in 270/270 runs |
+| Capacity of the free tier | Load test: about 24 requests/s at concurrency 10, draft preview p50 0.47 s, p95 under 2.4 s, no server errors |
 
 ## 7. Security
 

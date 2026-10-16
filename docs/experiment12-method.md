@@ -1,5 +1,7 @@
 # Experiments 1 and 2: method
 
+> Status (17 October 2026): Experiment 2 has been run on the frozen test split ([results](experiment2-results.md)). Experiment 1 is implemented and piloted on 4 dev requests; its test-split run was deferred.
+
 Experiment 1 asks whether a `SKILL.md` drafting playbook beats a vanilla LLM (RQ1). Experiment 2 asks whether an agent harness beats a single LLM call (RQ2). Both use the same frozen test set, model, retrieval and metrics. Results: `eval/results/exp1/summary.md`, `eval/results/exp2/summary.md`, and the README.
 
 ## Test set
