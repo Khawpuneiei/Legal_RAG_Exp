@@ -28,3 +28,8 @@ Thumbs.db
 
 # local stack secrets
 deploy/.env
+
+# terraform
+.terraform/
+*.tfstate*
+*.tfvars

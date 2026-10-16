@@ -80,7 +80,7 @@ jobs:
   publish:
     name: publish image to GHCR (main only)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test, db-integration, image, helm]
+    needs: [test, db-integration, image, helm, terraform]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -105,6 +105,22 @@ jobs:
           tags: |
             ghcr.io/khawpuneiei/legal-agreement-ai:${{ github.sha }}
             ghcr.io/khawpuneiei/legal-agreement-ai:latest
+
+  terraform:
+    name: Terraform fmt + validate (Azure platform)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: deploy/terraform/azure
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
 
   helm:
     name: Helm chart lint + schema validation
