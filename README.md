@@ -41,13 +41,15 @@ All numbers come from [docs/experiment3-results.md](docs/experiment3-results.md)
 | Grounding eval | 90 | Ask recall (requested clauses correctly cited) | 0.000 | 0.340 | 0.521 | **0.556** |
 | Grounding eval | 90 | Citation accuracy | – | 0.493 | **0.617** | 0.606 |
 
+<img src="eval/results/exp3/figures/generation_grounding.png" alt="Generation and grounding: hallucinated-clause rate R0 1.00, R1 0.02, R4 0.01, R5 0.01; citation accuracy R1 0.49, R4 0.62, R5 0.61; ask recall R0 0.00, R1 0.34, R4 0.52, R5 0.56" width="100%">
+
 <p>
   <img src="eval/results/exp3/figures/synthetic_ndcg10.png" alt="Synthetic clause library nDCG@10 by condition: R1 0.192, R2 0.284, R3 0.439, R4 0.511, R4e 0.519, R4q 0.454, R5 0.536, BM25 alone 0.469" width="49%">
-  <img src="eval/results/exp3/figures/generation_grounding.png" alt="Generation and grounding: hallucinated-clause rate R0 1.00, R1 0.02, R4 0.01, R5 0.01; citation accuracy R1 0.49, R4 0.62, R5 0.61; ask recall R0 0.00, R1 0.34, R4 0.52, R5 0.56" width="49%">
+  <img src="eval/results/exp3/figures/acord_ndcg10.png" alt="ACORD test nDCG@10 by condition: BM25 0.443, R1 0.554, R2 0.574, R3 0.550, R4 0.581, R4e 0.606, R4q 0.609" width="49%">
 </p>
 <p>
-  <img src="eval/results/exp3/figures/acord_ndcg10.png" alt="ACORD test nDCG@10 by condition: BM25 0.443, R1 0.554, R2 0.574, R3 0.550, R4 0.581, R4e 0.606, R4q 0.609" width="49%">
   <img src="eval/results/exp3/figures/lbr_recall_8kchars.png" alt="LegalBench-RAG-mini recall within 8,000 retrieved characters: BM25 0.150, R1 0.408, R2 0.338, R3 0.270, R4 0.345, R4e 0.366, R4q 0.321, R5 0.631" width="49%">
+  <img src="eval/results/exp3/figures/synthetic_recall5.png" alt="Synthetic clause library Recall@5 by condition: R5 0.488 highest, R4 0.358, R1 0.371" width="49%">
 </p>
 
 - **Retrieval is what makes grounded drafting possible.** Without the library, 99.5% of drafted clauses cannot be traced to an approved clause. With any retrieval it is 2% or less (R1 vs R0: −0.976, significant).
