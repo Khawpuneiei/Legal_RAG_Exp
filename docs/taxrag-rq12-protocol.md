@@ -145,6 +145,14 @@ bc878894771734c1ec6e1c96ce5d483d80c9a22c11edc5177642bbf5678f88c3  skills/tax-ans
 08a61d4f675b9db352b8e20ddb3e4bf030eaea9cd09d8ab1e3cae0ad40f6d201  skills/tax-answering-self/SKILL.md
 ```
 
+*Note added on 1 November 2026, when the files were committed:* three of these files had Windows (CRLF) line endings when they were hashed, and git stores them with LF line endings. The content is unchanged. Their hashes as committed are:
+
+```
+933bc886c3193b8c0d5b4d42824a260201ea785b326512cc90220bed798b31bb  skills/tax-answering/modules/group-relief.md
+8c5850a19610b52b4213a77d48436e958ba31ed08f4f2cb940ebf2599b953ffd  skills/tax-answering/modules/start-of-business.md
+31cbe7b310b73f131e60939bd166a5a55bc25e2d7b7e954815b811725e43fba5  skills/tax-answering-self/SKILL.md
+```
+
 **How the skill was written:**
 - One Claude agent wrote error notes from the 40 blind-judged dev questions: B0 and B1, 70 distinct answers, κ 0.92.
 - Six agents, one per file, wrote from those notes, the guides and the Act chunks.

@@ -48,7 +48,8 @@ def main() -> None:
         for seed in args.seeds:
             out = llm.generate(prompt, system=SYSTEM, temperature=0.3, seed=seed, json_mode=True, max_tokens=700)
             m = score(q, parse(out["text"]), clauses, by_key_to_id, shown)
-            rows.append(dict(condition="R6d", qid=q.qid, seed=seed, latency_s=out["latency_s"], context_clauses=len(shown), **m, raw=out["text"][:4000]))
+            rows.append(dict(condition="R6d", qid=q.qid, seed=seed, latency_s=out["latency_s"], context_clauses=len(shown), **m, raw=out["text"][:4000],
+                             done_reason=out.get("done_reason"), repeat_limit=out.get("done_reason") == "repeat_limit"))
     with open(OUT / "generation_r6d_per_item.jsonl", "w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
@@ -69,6 +70,10 @@ def main() -> None:
             mean, lo, hi = bootstrap_ci(per) if per else (float("nan"),) * 3
             cells.append("–" if mean != mean else (f"{mean:.1f}" if m == "context_clauses" else f"{mean:.3f} [{lo:.3f}, {hi:.3f}]"))
         lines.append(f"| {cond} | " + " | ".join(cells) + " |")
+    aborted = sum(r["repeat_limit"] for r in rows)
+    capped = sum(r["done_reason"] == "length" for r in rows)
+    lines += ["", f"{capped} of {len(rows)} R6d replies stopped at the 700-token cap and {aborted} at Ollama's token repeat limit (0.40+). "
+              "Either way the reply is incomplete and scores as no selections."]
     (OUT / "generation_r6d_summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
 

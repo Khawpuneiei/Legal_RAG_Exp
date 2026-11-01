@@ -3,7 +3,7 @@
 **Project:** AI-assisted legal agreement generation and workflow automation for a MAS-regulated fund manager (Singapore).
 **Live demo:** https://legal-agreement-ai.vercel.app (free tier, synthetic data, rules mode) · [presenter script](docs/demo-script.md)
 **Architecture:** [docs/architecture.md](docs/architecture.md) · **Deployment:** [docs/deployment.md](docs/deployment.md) · **Governance:** [docs/governance.md](docs/governance.md) · **Plan:** [docs/project-plan.md](docs/project-plan.md)
-**Status (17 October 2026):** Experiments 2 and 3 are run on the frozen test split. Experiment 1 is implemented and piloted on the dev split; its full run is deferred. The application is deployed on a free tier (Vercel + Supabase, Singapore region), and the production kit (container image, Docker Compose, Helm chart, Terraform for Azure, CI) is in the repository and validated.
+**Status (1 November 2026):** Experiments 1, 2 and 3 are run on the frozen test split, and the Experiment 3 methods and RQ1/RQ2 have been tested on a teammate's Singapore income-tax RAG (TaxRAG). The application is deployed on a free tier (Vercel + Supabase, Singapore region), and the production kit (container image, Docker Compose, Helm chart, Terraform for Azure, CI) is in the repository and validated.
 
 This README answers two research questions that the project plan left open:
 
@@ -20,10 +20,11 @@ The project has five research questions: RQ1–RQ3 from the [project plan](docs/
 
 | Research question | Status | Evidence | Short answer |
 |---|---|---|---|
-| **RQ1** (plan): does a `SKILL.md` playbook improve drafting over a vanilla LLM? | Implemented, dev pilot only | Experiment 1, [method](docs/experiment12-method.md) | Full run deferred, below |
+| **RQ1** (plan): does a `SKILL.md` playbook improve drafting over a vanilla LLM? | **Answered** | Experiment 1: 7 conditions × 90 requests × 3 seeds ([results](docs/experiment1-results.md)) | **Yes, the focused skill only** (success 0.067 → 0.219); the same content given all at once does not help, below |
 | **RQ2** (plan): does an agent harness outperform a single LLM call? | **Answered** | Experiment 2: 7 harnesses × 90 requests × 3 seeds | **No** with a local 7B model; rules-first decomposition wins, below |
 | **RQ3** (plan): does a stronger retrieval pipeline improve accuracy and grounding? | **Answered** | Experiment 3: three benchmarks and a grounding eval | **Yes**, below |
-| **Q2** (README): does A\*-guided clause-graph retrieval help? | **Partly answered** | Experiment 3, conditions R6a–R6d | **Yes for self-contained evidence; no against plain BFS**, below |
+| **Q2** (README): does A\*-guided clause-graph retrieval help? | **Partly answered** | Experiment 3, conditions R6a–R6d | **Yes for almost self-contained evidence and more accurate citations; no against plain BFS**, below |
+| **TaxRAG** (transfer): do the Experiment 3 methods, and RQ1/RQ2, work on the teammate's Singapore income-tax RAG? | **Answered** | His corpus and code, 149 held-out questions, blind-judged answers ([methods](docs/taxrag-results.md), [RQ1/RQ2](docs/taxrag-rq12-results.md)) | **A\* transfers for evidence completeness; the reranker, the skill and a research pipeline do not; a retry of unusable replies helps a little (n.s.)**, with local 7–8B models, below |
 | **Q1** (README): which production stack? | **Answered by building it** | [docs/architecture.md](docs/architecture.md), the live deployment, measured in `eval/results/deployed/` | Below |
 
 "Significant" means the 95% paired bootstrap CI of the difference excludes zero.
@@ -88,7 +89,7 @@ The project has five research questions: RQ1–RQ3 from the [project plan](docs/
 
 ### README Q2 — Does A\*-guided clause-graph retrieval help?
 
-**Answer: it makes the evidence self-contained, but it does not beat plain BFS on definitions, as hypothesised.** All conditions get the same 1,200-token budget on the synthetic test split.
+**Answer: it makes the evidence almost self-contained, and drafting from it makes citations more accurate, but it does not beat plain BFS on definitions, as hypothesised.** All conditions get the same 1,200-token budget on the synthetic test split.
 
 | Condition | Clause recall | Definition coverage | Cross-reference completeness | Legal requirements satisfied |
 |---|---|---|---|---|
@@ -99,25 +100,76 @@ The project has five research questions: RQ1–RQ3 from the [project plan](docs/
 
 <img src="eval/results/exp3/figures/synthetic_graph.png" alt="Graph expansion at an equal 1,200-token budget: clause recall, definition coverage and cross-reference completeness for R5@budget, R6a, R6b, R6c and R6d" width="70%">
 
-- A\* raises definition coverage by +0.64 over flat retrieval at the same budget, with no significant loss of the requested clauses (clause recall −0.04, not significant). The drafter receives each clause together with the definitions and linked clauses it depends on.
+- A\* raises definition coverage by +0.64 over flat retrieval at the same budget, with no significant loss of the requested clauses (clause recall −0.04, not significant). The drafter receives nearly all the definitions its clauses use (0.97–0.98) and most of the clauses they cross-reference (0.69–0.80, against 0.42 for flat retrieval).
 - The pre-registered hypothesis "A\* beats BFS on definition coverage and cross-reference completeness" is **rejected**. BFS scores higher on both, but it finds about a fifth fewer of the requested clauses (0.508 vs 0.644) and satisfies fewer legal requirements (0.690 vs 0.950).
 - The heuristic tuned on dev is inadmissible and better (+0.11 cross-reference completeness, significant). This matches the Distance-Indexed Neural A\* paper (section 2.2).
+- **Drafting from A\* evidence (addendum, 1 November 2026):** given the R6d evidence (19 clauses on average instead of 5), the 7B drafter cites more accurately. Citation accuracy is 0.705 against 0.606 for R5 (+0.098 [+0.029, +0.171], Wilcoxon p = 0.023); R5 is the 16 October run on an earlier Ollama build. Ask recall does not change significantly (+0.017). Claim support falls slightly, a borderline result (−0.025; the CI's upper end is at zero, Wilcoxon p = 0.078). 10 of the 270 replies were cut off at the 700-token output cap, which R4 and R5 never reached, so the larger evidence set needs a higher cap. [Details](docs/experiment3-results.md#addendum-drafting-from-a-graph-evidence-r6d-1-november-2026).
 
-### RQ1 — Does a SKILL.md playbook beat a vanilla LLM? (not run on the test split yet)
+### TaxRAG — do the Experiment 3 methods transfer to Singapore income tax?
 
-Experiment 1 is fully implemented: a `SKILL.md` skill in the Anthropic Agent Skills layout ([skills/legal-agreement-drafting](skills/legal-agreement-drafting/)), seven conditions (S0 vanilla, S1 long system prompt, S2 focused skill that the model loads file by file, S3 comprehensive skill, S4 skill written by the model itself, S5 S2 on qwen2.5:3b, S0s S0 on qwen2.5:3b) and the checklist-compliance and format metrics ([method](docs/experiment12-method.md)). A 4-request pilot on the dev split ran end to end. The full test-split run (about 4 GPU hours on the reference laptop), the Experiment 3 graph-evidence drafting addendum and the LLM judge of reviewer notes were deferred on 17 October 2026. To run them:
+**Answer: only A\* graph expansion has the same retrieval effect as on legal agreements. The abstention gate is not worth it in either domain, and no method makes the answers significantly more correct.** The methods ran on the teammate's corpus, chunks, budget and scoring ([Saiharshaa/SGtax-rag](https://github.com/Saiharshaa/SGtax-rag) at `ac04f49`; his published table reproduces exactly). They were tested on 79 answerable held-out test questions.
 
-```bash
-OLLAMA_HOST=http://127.0.0.1:11435 RERANK_BATCH=8 .venv/Scripts/python.exe eval/exp12.py --exp 1 --workers 4
-```
-```bash
-.venv/Scripts/python.exe eval/generation_eval_graph.py
-```
-```bash
-.venv/Scripts/python.exe eval/judge.py
-```
+| Method | Legal (Experiment 3) | Tax (held-out test) | Transfers? |
+|---|---|---|---|
+| Cross-encoder reranker | nDCG@10 +0.072, significant | No variant beats his Gemini retrieval; on his own first stage, −0.089 R@2,500 and −0.129 MRR (significant) | No |
+| Contextual chunks | Recall@5 +0.130, significant | R@2,500 +0.032, not significant (local embedder) | Not shown |
+| A\* graph expansion | Definition coverage +0.64 | Same budget, his seeds: dependencies resolved 6.1 → 12.8 and unresolved 17.7 → 6.2 (significant); gold sections −0.05 vs his flat hits (not significant), −0.07 vs his one-hop expansion (significant) | Yes, for evidence |
+| Abstention gate | Model abstained by itself (10/10) | qwen2.5:7b refuses 20/20 out-of-scope by itself, and on answerable questions the gate removes 3 wrong and 2 right answers. qwen3:8b refuses 19/20 itself in the first round (the 20th ends unanswered at the token cap), but the same setup answers 3/20 in the RQ1/RQ2 re-run; its first-round answers to the 5 gated questions include none that is wrong | Mostly the same: the model declines most by itself, and on tax the gate also blocks right answers |
 
-The first command expects the parallel Ollama server described in `scripts/run_all_experiments.sh`; the test set, skill files and caches are already in place.
+- **Answers:** two blind judges graded 483 distinct answers from qwen2.5:7b (κ = 0.92). No configuration is significantly more or less correct than his `improved` retrieval. The model is the bottleneck: with his retrieval every gold section is in its context for 67 of 79 questions, yet only 30 of its 56 answers to them are fully correct.
+- **With a reasoning model:** the local qwen3:8b answered under his 2,000-token cap as a stand-in for his gpt-oss-120b; 142 distinct answers were judged (κ = 0.97).
+  - R6y is level with his deployed context (first qwen3:8b round): correct (all) 0.753 vs 0.728, +0.025 [−0.038, +0.089], not significant. A fresh re-grade of the 20 questions where they differ gives +0.006.
+  - The stronger model lifts his setup from 0.513 to 0.728 and cuts wrong answers from 25% to 6%, more than any retrieval change.
+  - The cap, which counts reasoning tokens, was reached on 6% of calls. Most of those returned no text, which his `generate.py` counts as a refusal.
+- **For his repo:** keep his retrieval and drop the reranker. Offer **R6y** as an opt-in configuration: A\* over dependency edges in place of his one-hop expansion, with the same hits and tokens. It resolves 0.71 of the hits' own cross-references, definitions and split pieces against 0.50 (+0.207, significant). Gold recall does not change, and judged correctness shows no significant change with either local model (qwen2.5:7b −0.006 [−0.076, +0.070]; qwen3:8b +0.025 [−0.038, +0.089] in the first round and +0.019 in the second, below). Its additions bring references of their own, so the context ends with about 6 more unresolved ones. It needs no embeddings. The kit is in [`integrations/bc3415-tax-rag/`](integrations/bc3415-tax-rag/). Before making it the default, test it with his app's own answer model, gpt-oss-120b.
+- **Corrected after review:** the first version recommended R6x, a variant that also follows embedding neighbours and was tuned on a share measure. That measure's denominator grows with what an expansion adds, which is where R6x's advantage came from. On the hits' own dependencies, R6x is worse than his expansion.
+
+**RQ1 and RQ2 on tax.** The project's skill and harness questions, asked of his pipeline ([protocol](docs/taxrag-rq12-protocol.md), written before any answer existed; [results](docs/taxrag-rq12-results.md)). qwen3:8b stands in for his gpt-oss-120b, with his prompt, citation checker and 2,000-token cap. Two blind LLM judges graded 741 distinct answers (κ 0.88). Test split, 79 answerable questions:
+
+| Condition | Correct (all) | Answered wrongly | Calls per question | Against his setup |
+|---|---|---|---|---|
+| B0: his deployed setup | 0.747 | 5 | 1.0 | |
+| B1: R6y (A\*) in place of his expansion | 0.766 | 5 | 1.0 | +0.019, n.s. |
+| S2: focused tax skill (RQ1, primary) | 0.722 | 10 | 2.0 | −0.025, n.s. |
+| V: retry an unusable reply (RQ2, primary) | **0.785** | 7 | 1.1 | +0.038, 4 better and 0 worse, Holm p 0.375 |
+| DTR: Deep Tax Research pipeline (RQ2, primary) | 0.722 | 6 | 3.0 | −0.025, n.s. |
+| DTRa+V: research agent + retry (exploratory, picked after the results) | 0.823 | 3 | 4.4 | +0.076; +0.038 against V, n.s.; a hypothesis to test |
+
+- B0 and B1 were generated and judged again in this round (different server layout), so 0.747 and 0.766 are a second run of the first round's 0.728 and 0.753.
+- **None of the three primary comparisons is significant after Holm.** 3 of the retry's 4 rescues came from a reply that ran out at the token cap with no text, and 2 of its 6 extra answers were wrong.
+- **The skill does not transfer:** unlike legal drafting (RQ1 below), the focused skill does not help tax answers (S2 −0.025, n.s.). In an exploratory count (not pre-registered, uncorrected), both whole-skill variants answered 14 test questions wrongly against B0's 5.
+- **Sent to his repo:** [Saiharshaa/SGtax-rag#6](https://github.com/Saiharshaa/SGtax-rag/pull/6) (open) adds two app toggles, both off by default: **Deep Tax Search** (R6y as `improved_astar`) and **Retry** (up to 2 retries of an unusable reply). It also always retries an empty reply, at most twice; replaying the recorded attempts this way gives 0.778 on test and 0.775 on dev. Deep Tax Research was dropped from the PR after this test. None of it has been run with his app's own models.
+
+### RQ1 — Does a SKILL.md playbook beat a vanilla LLM?
+
+**Answer: yes, but only the focused skill, where the model loads the files it needs.** The skill is in the Anthropic Agent Skills layout ([skills/legal-agreement-drafting](skills/legal-agreement-drafting/)). The run used qwen2.5:7b on the 90 frozen test requests with 3 seeds. Full write-up: [docs/experiment1-results.md](docs/experiment1-results.md).
+
+| Condition | Success | Route correct | Defect recall | Field accuracy | Citation accuracy | Checklist compliance | LLM calls | Tokens per request |
+|---|---|---|---|---|---|---|---|---|
+| S0: vanilla | 0.067 | 0.359 | 0.443 | 0.887 | 0.589 | 0.817 | 1 | 1,201 |
+| S1: skill content as a long system prompt | 0.063 | 0.422 | 0.423 | 0.768 | 0.575 | 0.820 | 1 | 4,654 |
+| **S2: focused skill, model loads ≤ 3 files** | **0.219** | **0.500** | **0.711** | **0.945** | **0.751** | **0.962** | 2 | 6,037 |
+| S3: comprehensive skill | 0.056 | 0.374 | 0.472 | 0.763 | 0.587 | 0.819 | 1 | 4,424 |
+| S4: skill written by the model | 0.030 | 0.359 | 0.366 | 0.780 | 0.404 | 0.784 | 1 | 1,965 |
+| S5: S2 on qwen2.5:3b | 0.056 | 0.252 | 0.321 | 0.892 | 0.646 | 0.868 | 2 | 5,920 |
+| S0s: S0 on qwen2.5:3b | 0.063 | 0.337 | 0.163 | 0.913 | 0.538 | 0.821 | 1 | 1,174 |
+
+<p>
+  <img src="eval/results/exp1/figures/scoreboard.png" alt="Experiment 1: success, defect recall, field accuracy, ask recall, route accuracy and checklist compliance for S0, S1, S2, S3, S4, S5 and S0s" width="100%">
+</p>
+
+- **The focused skill wins:** S2 against S0, success +0.152 [+0.07, +0.24], McNemar 18 / 4, p = 0.004 (Holm over S1–S4: 0.017). It also catches more planted defects (+0.27), fills fields better (+0.06), and cites requested clauses more often (+0.18); all of these are significant. It also escalates 10 of 15 prompt-injection runs (S0: none), on only 5 requests and untested. It loaded the right checklist in all 270 runs.
+- **Focus, not content:** S1 and S3 give the model `SKILL.md` and all seven of its files at once, where S2 loads three. They do no better than vanilla and lose 0.12 field accuracy. S2 beats both (p = 0.007 and 0.003). The skill the model wrote for itself (S4) is slightly worse than vanilla (−0.037, CI excludes zero; McNemar p = 1).
+- **On a smaller model it does not raise success:** S5 against S0s, −0.007 (3 / 4, p = 1).
+- **Caveats:**
+  - Without the all-fields-correct condition, S2's gain is +0.111 [−0.00, +0.22] and no longer significant (p = 0.23).
+  - S2 escalates far more: it routes 76% of the escalate requests correctly (S0: 5%), but only 13% of the standard-review ones (S0: 100%).
+  - It flags a defect on 98% of clean requests (S0: 80%).
+  - It uses 5× the tokens.
+  - An LLM judge (llama3.1:8b, 18 sampled requests) rates its reviewer notes no better than S0's: −0.022 [−0.12, +0.08]. It flags invented facts in them more often (9 requests against 1, p = 0.02, uncorrected and one of many judge comparisons). The judge has not been checked against a person.
+- **Cross-checks:** Experiment 2's H0, a single call with the agreement type's checklist and the fallback positions picked by the code, scored 0.233. The rules-first designs still lead (H-det 0.444, H3b 0.352). On tax, the focused skill does not help (TaxRAG above).
+
+**What it changes:** when the LLM drafts, it gets the skill index and loads the checklist it needs, not the whole playbook in the prompt. The rules keep owning structural checks and routing (RQ2).
 
 ### Q1 — Production stack
 
@@ -155,6 +207,20 @@ STORE=memory SEARCH=keyword .venv/Scripts/python.exe -m uvicorn src.app.main:app
 ```
 
 Then open http://localhost:8000. The full production-like stack is `docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build` (see [docs/deployment.md](docs/deployment.md)). Tests: `.venv/Scripts/python.exe -m pytest -q` (the Postgres integration tests run when `DATABASE_URL` points at a migrated database, as in CI).
+
+## Running Experiment 1 locally
+
+```bash
+OLLAMA_HOST=http://127.0.0.1:11435 RERANK_BATCH=8 .venv/Scripts/python.exe eval/exp12.py --exp 1 --workers 4
+```
+```bash
+OLLAMA_HOST=http://127.0.0.1:11435 .venv/Scripts/python.exe eval/generation_eval_graph.py
+```
+```bash
+OLLAMA_HOST=http://127.0.0.1:11435 .venv/Scripts/python.exe eval/judge.py
+```
+
+They expect the parallel Ollama server described in `scripts/run_all_experiments.sh`. The first takes about 3 hours on the reference laptop (1,890 runs); the second is the Experiment 3 addendum (drafting from A\*-graph evidence) and the third the LLM judge of reviewer notes. Every output is cached in `.cache/`, so `eval/exp12.py --report 1` rebuilds the tables and figure in seconds.
 
 ## Running Experiment 2 locally
 
@@ -225,6 +291,10 @@ On Linux or macOS, use `.venv/bin/python`. Without an NVIDIA GPU, install the CP
 LLM outputs, embeddings and reranker scores are cached in `.cache/`, so reruns take minutes.
 
 **Results:** see [Results by research question](#results-by-research-question) above, and [docs/experiment3-results.md](docs/experiment3-results.md) for the full write-up.
+
+## Running the TaxRAG experiment
+
+It needs the teammate's repository with its built index next to this one (`TAX_RAG_DIR`, default `../bc3415-tax-rag`), and `GEMINI_API_KEY` in either repository's `.env` (both git-ignored) for the rows on his Gemini index. Only query embeddings are requested. The commands are in [docs/taxrag-results.md, Reproducing](docs/taxrag-results.md#reproducing). IRAS evidence quotes, chunk contexts, answer texts and judge batches are kept in `.cache/tax/`, outside the repository.
 
 ---
 
