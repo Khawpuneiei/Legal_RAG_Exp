@@ -202,7 +202,8 @@ def test_following_references_counts_the_other_sources_as_present_so_they_cost_n
 
 def test_the_real_graph_does_not_spend_the_allowance_on_a_present_dependency():
     """ClauseGraph.astar with `present`: a dependency already in the evidence is not re-added or paid for."""
-    import numpy as np
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("networkx")
     from src.retrieval.graph import ClauseGraph
     g = ClauseGraph.__new__(ClauseGraph)
     g.clauses = {i: {"text": " ".join(["w"] * n)} for i, n in [("s", 5), ("p", 20), ("d", 5)]}

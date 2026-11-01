@@ -4,4 +4,4 @@ import importlib.util
 
 collect_ignore = []
 if importlib.util.find_spec("numpy") is None or importlib.util.find_spec("networkx") is None:
-    collect_ignore += ["test_graph.py", "test_metrics.py", "test_generation_eval.py", "test_synthetic.py"]
+    collect_ignore += ["test_graph.py", "test_metrics.py", "test_generation_eval.py", "test_synthetic.py", "test_tax_judge.py"]
