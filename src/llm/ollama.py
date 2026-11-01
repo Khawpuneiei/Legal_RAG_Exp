@@ -29,9 +29,13 @@ class OllamaLLM:
         self.cache = JsonCache(f"{cache_name}-{model.replace(':', '_')}")
 
     def generate(self, prompt: str, system: str = "", temperature: float = 0.0, seed: int = 0,
-                 json_mode: bool = False, max_tokens: int = 512) -> dict:
-        """Return {"text", "latency_s", "cached", "prompt_tokens", "completion_tokens"}."""
-        key = stable_hash(self.model, system, prompt, str(temperature), str(seed), str(json_mode), str(max_tokens), str(self.num_ctx))
+                 json_mode: bool = False, max_tokens: int = 512, think: bool | None = None) -> dict:
+        """Return {"text", "latency_s", "cached", "prompt_tokens", "completion_tokens"}; calls made since they were
+        recorded also have "done_reason" ("length" at the max_tokens cap) and a reasoning model's "thinking", which
+        Ollama returns apart from the text. `think` switches a reasoning model's thinking on or off; it is sent, and
+        part of the cache key, only when set, so earlier entries keep their keys."""
+        parts = [self.model, system, prompt, str(temperature), str(seed), str(json_mode), str(max_tokens), str(self.num_ctx)]
+        key = stable_hash(*parts) if think is None else stable_hash(*parts, f"think={think}")
         hit = self.cache.get(key)
         if hit is not None:
             out = dict(hit)
@@ -44,20 +48,29 @@ class OllamaLLM:
         }
         if json_mode:
             body["format"] = "json"
+        if think is not None:
+            body["think"] = think
         t0 = time.time()
         for attempt in range(4):
             try:
                 r = requests.post(f"{HOST}/api/generate", json=body, timeout=900)
+                if r.status_code == 500 and "repeat limit" in r.text:
+                    break   # Ollama 0.40+ aborts a reply stuck repeating one token; seeded, so a retry would repeat it
                 r.raise_for_status()
                 break
             except requests.RequestException:
                 if attempt == 3:
                     raise
                 time.sleep(10)
-        data = r.json()
+        data = r.json() if r.ok else {"response": "", "done_reason": "repeat_limit"}
         out = {"text": data["response"], "latency_s": round(time.time() - t0, 3),
                "prompt_tokens": data.get("prompt_eval_count") or approx_tokens(system + prompt),
-               "completion_tokens": data.get("eval_count") or approx_tokens(data["response"])}
+               "completion_tokens": data.get("eval_count") or approx_tokens(data["response"]),
+               "done_reason": data.get("done_reason")}
+        if data.get("eval_duration") is not None:   # the model's own time, without queueing or retries
+            out["compute_s"] = round(((data.get("prompt_eval_duration") or 0) + data["eval_duration"]) / 1e9, 3)
+        if data.get("thinking"):
+            out["thinking"] = data["thinking"]
         with _LOCK:
             self.cache.put(key, out)
         return {**out, "cached": False}

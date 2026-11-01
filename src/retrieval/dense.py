@@ -14,6 +14,9 @@ from src.common import CACHE, stable_hash
 MODELS = {
     "bge-m3": dict(name="BAAI/bge-m3", query_prompt_name=None, max_seq_length=1024),
     "qwen3-emb-0.6b": dict(name="Qwen/Qwen3-Embedding-0.6B", query_prompt_name="query", max_seq_length=1024),
+    # small CPU-deployable embedder (TaxRAG D2); BGE v1.5 recommends this instruction for short retrieval queries
+    "bge-small": dict(name="BAAI/bge-small-en-v1.5", query_prompt_name=None, max_seq_length=512,
+                      query_prefix="Represent this sentence for searching relevant passages: "),
 }
 
 
@@ -63,6 +66,8 @@ class Embedder:
         if path.exists():
             return np.load(path)
         kw = {"prompt_name": self.cfg["query_prompt_name"]} if self.cfg["query_prompt_name"] else {}
+        if self.cfg.get("query_prefix"):
+            texts = [self.cfg["query_prefix"] + t for t in texts]
         emb = self.model.encode(texts, batch_size=self.batch_size, normalize_embeddings=True, convert_to_numpy=True, **kw).astype(np.float32)
         path.parent.mkdir(parents=True, exist_ok=True)
         np.save(path, emb)
