@@ -1,0 +1,509 @@
+diff --git a/README.md b/README.md
+index 52b0f7c..ec9df85 100644
+--- a/README.md
++++ b/README.md
+@@ -62,6 +62,38 @@ Full tables and caveats: [`results/metrics.md`](results/metrics.md) and [`docs/P
+ section: on these questions, dense search alone did best on plain-language questions, hybrid on section
+ references.
+ 
++### Optional: A* dependency expansion (`improved_astar`)
++
++`improved` appends the first chunk of up to 3 sections its hits cite. `improved_astar` keeps the same hits and
++instead lets an A* search ([`rag/graph.py`](rag/graph.py)) add what they depend on, cheapest first, within the
++same ~450 extra tokens:
++
++- the subsections and sections they refer to;
++- the subsection that defines their terms ("In this section ...");
++- the earlier piece of a split provision.
++
++It also follows the dependencies of what it added, while the allowance lasts. It cannot cover them all, so
++its context ends up with more unresolved references than `improved`'s. It needs no embeddings: the graph is
++built from the chunks' text on first use (0.2 s, under 10 MB). It comes from Experiment 3 of
++[Legal_RAG_Exp](https://github.com/Khawpuneiei/Legal_RAG_Exp) (`docs/taxrag-results.md`, condition R6y).
++
++Results on 79 held-out answerable questions, with Gemini embeddings and the same hits for both:
++
++| Context sent to the model | `improved` | `improved_astar` |
++|---|---|---|
++| Gold sections and paragraphs in it | 0.918 | 0.926 |
++| The hits' own cross-references, definitions and split pieces resolved in it | 0.499 | **0.706** |
++| References left unresolved in the context (lower is better) | 19.9 | 26.0 (its additions bring their own) |
++| Tokens | 2,753 | 2,766 |
++| Answers judged correct (qwen2.5:7b, blind; partial = half) | 0.513 | 0.506 (no significant difference) |
++
++Not yet tested with the app's own models (gpt-oss-120b, Gemini Flash), so the app still uses `improved`. To
++try it, change `IMPROVED` in `app.py` to `("Structure-aware (this project)", "improved_astar", "improved_bm25")`, or:
++
++```bash
++python scripts/ask.py --config improved_astar --sources "Can a loss-making company transfer its losses to a sister company?"
++```
++
+ ## Demo video
+ 
+ [`results/demo.mp4`](results/demo.mp4) (3 min, narrated) walks through the app; the narration with timestamps
+diff --git a/rag/display.py b/rag/display.py
+index 7e579c8..01c49cd 100644
+--- a/rag/display.py
++++ b/rag/display.py
+@@ -6,6 +6,8 @@ EXCERPT_CHARS = 600   # sources are shown as short excerpts, never whole documen
+ 
+ RETRIEVAL_LABELS = {
+     "improved": "structure-aware chunks, Gemini embeddings (+ BM25 and section boost when a section is named)",
++    "improved_astar": "structure-aware chunks, Gemini embeddings (+ BM25 and section boost when a section is named), "
++                      "A* dependency expansion",
+     "improved_bm25": "structure-aware chunks, BM25 + section boost (embeddings unavailable)",
+     "baseline": "naive 500-token chunks, Gemini embeddings",
+     "naive_bm25": "naive 500-token chunks, BM25 (embeddings unavailable)",
+diff --git a/rag/generate.py b/rag/generate.py
+index cab8d23..e82832e 100644
+--- a/rag/generate.py
++++ b/rag/generate.py
+@@ -95,7 +95,8 @@ def render_citations(raw: str, sources: list[Chunk]) -> tuple[str, list[Chunk],
+ 
+ def answer(question: str, retriever: Retriever, models: list[ChatModel], config: str = "improved",
+            context_tokens: int = CONTEXT_TOKENS) -> Answer:
+-    """Retrieve, generate, and check citations. The expanded (cross-referenced) chunks are extra sources."""
++    """Retrieve, generate, and check citations. The expanded chunks (cited sections, or A*'s additions) are extra
++    sources."""
+     result = retriever.search(question, config, budget=context_tokens)
+     sources = [hit.chunk for hit in result.hits] + result.expanded
+     if not sources:
+diff --git a/rag/graph.py b/rag/graph.py
+new file mode 100644
+index 0000000..c1ef3c3
+--- /dev/null
++++ b/rag/graph.py
+@@ -0,0 +1,164 @@
++"""A* dependency expansion: an alternative to `Corpus.expand` that adds what the retrieved chunks depend on.
++
++`Corpus.expand` appends the first chunk of up to 3 sections the hits cite. This module instead searches a
++graph of the structured chunks for the hits' dependencies, cheapest first, within a token allowance:
++
++* REFERS_TO   "subsection (4)" -> that subsection of the same section; "subsection (1) of section 37B" ->
++              s 37B(1); "paragraph 6.1" in a guide -> that paragraph; each section in `cross_refs` -> any
++              chunk of that section.
++* DEFINED_IN  an Act subsection -> the subsection of its section that defines its terms ("In this section
++              ...", "In subsection (4) ...", "For the purposes of subsection (7) ...").
++* CONTINUES   piece k of a split provision -> piece k - 1.
++
++A dependency on a section, or on a subsection split into pieces, is resolved by any of its chunks. Chunks
++added for a hit can have dependencies of their own, which the search then follows too.
++
++The search is Experiment 3's R6 in the legal-agreement-ai repo (Khawpuneiei/Legal_RAG_Exp, condition R6y in
++docs/taxrag-results.md): f = g + h with
++    g = sum over the path from a hit of (edge cost + tokens(added chunk) / budget), budget = hit tokens + allowance
++    h = MU * unresolved dependencies(chunk) * C_MIN
++The heuristic there also has a query-similarity term. The search there can also follow seed-only edges from the
++hits: embedding neighbours, and guide paragraphs that cite an Act section. These are not dependencies, and R6y
++leaves them out by design. Its two weights were then tuned on the held-out dev questions, and both came out 0.
++So this is a cheapest-first search over dependency edges, and it needs no embeddings.
++"""
++
++import heapq
++import re
++from collections import defaultdict
++
++from rag.chunk import count_tokens
++from rag.schema import Chunk
++
++ALLOWANCE = 450      # extra tokens after the hits: Corpus.expand's mean on the dev questions
++MU = 0.0             # weight of the unresolved-dependency heuristic (tuned on dev)
++C_MIN = 0.2          # the reference's scale for h (its cheapest dependency edge on the legal clause graph)
++EDGE_COST = {"CONTINUES": 0.1, "DEFINED_IN": 0.2, "REFERS_TO": 0.3}
++
++_LABELS = r"((?:\(\w+\)(?:\s*(?:,|and|or|to)\s*)?)+)"
++SUBSECTION_REF = re.compile(rf"\bsubsections?\s+{_LABELS}(\s+of\s+section\s+(\d+[A-Z]{{0,3}}))?", re.I)
++PARA_REF = re.compile(r"\bparagraphs?\s+(\d+\.\d+(?:\s*(?:,|and|or|to)\s*\d+\.\d+)*)", re.I)
++LOCAL_DEFINITION = re.compile(r"^(?:In|For the purposes of)\s+(this section|this Part|subsections?\s+" + _LABELS + ")",
++                              re.I)
++
++
++def _labels(text: str) -> list[str]:
++    return [label.upper() if label[0].isdigit() else label.lower() for label in re.findall(r"\((\w+)\)", text)]
++
++
++def build_edges(chunks: list[Chunk]) -> list[dict]:
++    """Dependency edges src -> dst with a type and a group: any chunk of the group resolves the dependency."""
++    by_id = {chunk.chunk_id: chunk for chunk in chunks}
++    by_section: dict[str, list[str]] = defaultdict(list)          # "37B" -> chunk ids
++    by_sub: dict[tuple[str, str], list[str]] = defaultdict(list)  # ("37B", "1") -> chunk ids (split pieces)
++    by_para: dict[tuple[str, str], list[str]] = defaultdict(list) # (guide, "6.1") -> chunk ids
++    for chunk in chunks:
++        if chunk.doc_type == "act":
++            by_section[chunk.section].append(chunk.chunk_id)
++            if chunk.subsection:
++                by_sub[(chunk.section, chunk.subsection)].append(chunk.chunk_id)
++        else:
++            by_para[(chunk.chunk_id.split(":", 1)[0], chunk.para)].append(chunk.chunk_id)
++    edges: list[dict] = []
++
++    def add(src: str, dsts: list[str], etype: str, group: str) -> None:
++        for dst in dsts:
++            if dst != src:
++                edges.append(dict(src=src, dst=dst, type=etype, group=group))
++
++    for chunk in chunks:
++        if chunk.doc_type == "act":
++            for m in SUBSECTION_REF.finditer(chunk.text):
++                section = m.group(3) or chunk.section
++                for label in _labels(m.group(1)):
++                    if (section, label) in by_sub and not (section == chunk.section and label == chunk.subsection):
++                        add(chunk.chunk_id, by_sub[(section, label)], "REFERS_TO", f"sub:{section}({label})")
++            if chunk.split_index > 1:
++                pieces = by_sub.get((chunk.section, chunk.subsection)) or by_section[chunk.section]
++                i = pieces.index(chunk.chunk_id)
++                if i > 0:
++                    add(chunk.chunk_id, [pieces[i - 1]], "CONTINUES", pieces[i - 1])
++        else:
++            doc = chunk.chunk_id.split(":", 1)[0]
++            for m in PARA_REF.finditer(chunk.text):
++                for para in re.findall(r"\d+\.\d+", m.group(1)):
++                    if (doc, para) in by_para and para != chunk.para:
++                        add(chunk.chunk_id, by_para[(doc, para)], "REFERS_TO", f"para:{doc}:{para}")
++            if chunk.split_index > 1:
++                pieces = by_para[(doc, chunk.para)]
++                i = pieces.index(chunk.chunk_id)
++                if i > 0:
++                    add(chunk.chunk_id, [pieces[i - 1]], "CONTINUES", pieces[i - 1])
++        own = chunk.section if chunk.doc_type == "act" else None
++        for section in chunk.cross_refs:
++            if section != own and section in by_section:
++                add(chunk.chunk_id, by_section[section], "REFERS_TO", f"sec:{section}")
++    for section, ids in by_section.items():   # section-local definitions
++        for definition in ids:
++            m = LOCAL_DEFINITION.match(by_id[definition].text.strip())
++            if not m:
++                continue
++            scope = m.group(1).lower()
++            if scope.startswith("subsection"):
++                targets = [id_ for label in _labels(m.group(2) or "") for id_ in by_sub.get((section, label), [])]
++            elif scope == "this part":
++                targets = [c.chunk_id for c in chunks if c.doc_type == "act" and c.part == by_id[definition].part]
++            else:
++                targets = ids
++            for id_ in targets:
++                if id_ != definition:
++                    edges.append(dict(src=id_, dst=definition, type="DEFINED_IN", group=definition))
++    return edges
++
++
++class DependencyGraph:
++    """The structured chunks and their dependency edges, with the A* expansion."""
++
++    def __init__(self, chunks: list[Chunk]):
++        self.chunks = {chunk.chunk_id: chunk for chunk in chunks}
++        self.tokens = {chunk.chunk_id: count_tokens(chunk.text) for chunk in chunks}
++        self.out: dict[str, list[tuple[str, float]]] = defaultdict(list)
++        groups: dict[str, dict[str, set[str]]] = defaultdict(dict)
++        for e in build_edges(chunks):
++            self.out[e["src"]].append((e["dst"], EDGE_COST[e["type"]]))
++            groups[e["src"]].setdefault(e["group"], set()).add(e["dst"])
++        # chunk id -> its dependencies; each is a set of chunks, any one of which resolves it
++        self.deps: dict[str, list[set[str]]] = {id_: list(groups[id_].values()) for id_ in self.chunks}
++
++    def unresolved(self, chunk_id: str, evidence: set[str]) -> int:
++        return sum(1 for group in self.deps.get(chunk_id, ()) if not group & evidence)
++
++    def expand(self, hits: list[Chunk], allowance: int = ALLOWANCE, mu: float = MU) -> list[Chunk]:
++        """Chunks the hits depend on, in the order A* adds them, within `allowance` tokens after the hits.
++        The hits stay first and unchanged. The search stops when no dependency of the evidence is unresolved,
++        or when the allowance or the frontier runs out; a chunk too long for what is left is skipped."""
++        seeds = list(dict.fromkeys(chunk.chunk_id for chunk in hits))
++        used = sum(self.tokens[id_] for id_ in seeds)
++        budget = used + allowance
++        evidence, have = list(seeds), set(seeds)
++
++        def h(id_: str) -> float:
++            return mu * self.unresolved(id_, have) * C_MIN
++
++        frontier = [(h(s), i, s, 0.0) for i, s in enumerate(seeds)]
++        heapq.heapify(frontier)
++        tie = len(seeds)
++        while frontier and used < budget:
++            _, _, id_, g = heapq.heappop(frontier)
++            if id_ in have and not (id_ in seeds and g == 0.0):
++                continue
++            if id_ not in have:
++                if used + self.tokens[id_] > budget:
++                    continue
++                evidence.append(id_)
++                have.add(id_)
++                used += self.tokens[id_]
++            if all(self.unresolved(e, have) == 0 for e in evidence):
++                break
++            for dst, cost in self.out[id_]:
++                if dst in have:
++                    continue
++                g2 = g + cost + self.tokens[dst] / budget
++                heapq.heappush(frontier, (g2 + h(dst), tie, dst, g2))
++                tie += 1
++        return [self.chunks[id_] for id_ in evidence[len(seeds):]]
+diff --git a/rag/retrieve.py b/rag/retrieve.py
+index 360fbff..3c9e9c7 100644
+--- a/rag/retrieve.py
++++ b/rag/retrieve.py
+@@ -3,6 +3,7 @@ exact-section boost and optional one-hop expansion along cross-references.
+ 
+ Named configs are the rows of the evaluation table. `baseline` is the naive-chunk dense
+ retriever the project argues against; `improved` is structured chunks + hybrid + section boost.
++`improved_astar` is `improved` with the one-hop expansion replaced by A* dependency expansion (rag/graph.py).
+ 
+     retriever = Retriever()
+     result = retriever.search("Can a company deduct expenses before it started business?", "improved")
+@@ -16,6 +17,7 @@ from rag.chunk import count_tokens
+ from rag.dense import DenseIndex
+ from rag.embed import Embedder, GeminiEmbedder
+ from rag.fusion import RRF_K, rrf
++from rag.graph import DependencyGraph
+ from rag.refs import find_section_refs
+ from rag.schema import Chunk, load_chunks
+ 
+@@ -49,6 +51,7 @@ class RetrievalConfig:
+     dense: bool
+     section_boost: bool = False
+     expand_refs: bool = False
++    expand_astar: bool = False   # A* dependency expansion (rag/graph.py) instead of the one-hop one
+     # Use BM25 only when the question names a section. On the eval set, dense alone did best on plain-language
+     # questions (Recall@5 0.66 vs 0.57 hybrid) and hybrid on those naming a section (0.67-0.75 vs 0.50-0.56).
+     bm25_only_for_section_refs: bool = False
+@@ -68,6 +71,8 @@ CONFIGS = {
+ CONFIGS["baseline"] = CONFIGS["naive_dense"]
+ CONFIGS["improved"] = RetrievalConfig("structured", bm25=True, dense=True, section_boost=True, expand_refs=True,
+                                       bm25_only_for_section_refs=True)
++CONFIGS["improved_astar"] = RetrievalConfig("structured", bm25=True, dense=True, section_boost=True, expand_astar=True,
++                                            bm25_only_for_section_refs=True)
+ # What the app falls back to when dense search is unavailable (index still building, embedding quota used up)
+ CONFIGS["improved_bm25"] = RetrievalConfig("structured", bm25=True, dense=False, section_boost=True, expand_refs=True)
+ 
+@@ -85,7 +90,7 @@ class Hit:
+ class RetrievalResult:
+     query: str
+     hits: list[Hit]
+-    expanded: list[Chunk] = field(default_factory=list)   # cited sections, extra context for generation
++    expanded: list[Chunk] = field(default_factory=list)   # cited sections (or A*'s additions): extra context
+     query_sections: list[str] = field(default_factory=list)
+ 
+ 
+@@ -94,6 +99,7 @@ class Corpus:
+ 
+     def __init__(self, name: str, chunks: list[Chunk], bm25: BM25Index, dense: DenseIndex | None = None):
+         self.name, self.bm25, self.dense = name, bm25, dense
++        self._graph: DependencyGraph | None = None
+         self.chunks = {chunk.chunk_id: chunk for chunk in chunks}
+         self.order = {chunk.chunk_id: i for i, chunk in enumerate(chunks)}
+         self.by_section: dict[str, list[str]] = {}       # "14R" -> chunk ids in document order
+@@ -139,6 +145,12 @@ class Corpus:
+                     bonuses[id_] = SECTION_BOOST
+         return bonuses, [ref.canonical for ref in refs]
+ 
++    def dependency_graph(self) -> DependencyGraph:
++        """Built from the chunks on first use."""
++        if self._graph is None:
++            self._graph = DependencyGraph(list(self.chunks.values()))
++        return self._graph
++
+     def expand(self, hits: list[Chunk]) -> list[Chunk]:
+         """First chunk of each section the hits cite that isn't already among them (one hop, capped)."""
+         have = {chunk.section for chunk in hits if chunk.doc_type == "act"}
+@@ -201,5 +213,8 @@ class Retriever:
+         hits = [Hit(corpus.chunks[id_], scores[id_], positions.get("bm25", {}).get(id_),
+                     positions.get("dense", {}).get(id_), id_ in bonuses)
+                 for id_ in best]
+-        expanded = corpus.expand([hit.chunk for hit in hits]) if cfg.expand_refs else []
++        if cfg.expand_astar:
++            expanded = corpus.dependency_graph().expand([hit.chunk for hit in hits])
++        else:
++            expanded = corpus.expand([hit.chunk for hit in hits]) if cfg.expand_refs else []
+         return RetrievalResult(query, hits, expanded, sections)
+diff --git a/scripts/search.py b/scripts/search.py
+index 0e84390..4ece432 100644
+--- a/scripts/search.py
++++ b/scripts/search.py
+@@ -48,8 +48,9 @@ def main() -> None:
+         print(f"sections named in the query: {', '.join(result.query_sections)}")
+     for rank, hit in enumerate(result.hits, start=1):
+         print(f"{rank:>2}. {hit.score:.4f}  {describe(hit)}")
++    label = "added" if CONFIGS[args.config].expand_astar else "cited"   # A* also adds definitions and split pieces
+     for chunk in result.expanded:
+-        print(f"    + cited: {chunk.cite} {chunk.heading}")
++        print(f"    + {label}: {chunk.cite} {chunk.heading}")
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/tests/test_graph.py b/tests/test_graph.py
+new file mode 100644
+index 0000000..df8cc87
+--- /dev/null
++++ b/tests/test_graph.py
+@@ -0,0 +1,171 @@
++"""A* dependency expansion (rag/graph.py) on a tiny synthetic Act and guide (not real law)."""
++
++import pytest
++
++from rag.bm25 import BM25Index
++from rag.dense import DenseIndex
++from rag.embed import HashEmbedder
++from rag.graph import DependencyGraph, build_edges
++from rag.retrieve import CONFIGS, RetrievalConfig, Retriever
++from rag.schema import Chunk, save_chunks
++
++
++def act(section: str, subsection: str, text: str, part: str = "1", cross_refs=(), split=(1, 1)) -> Chunk:
++    label = f"{section}({subsection})" if subsection else section
++    return Chunk(f"STA:s{label}#{split[0]}", "act", "Sample Tax Act 2099", "sample.pdf", text,
++                 path=f"Sample Tax Act 2099 > s {label}", heading=f"Section {section}", part=part, section=section,
++                 subsection=subsection, cite=f"STA 2099, s {label}", cross_refs=list(cross_refs),
++                 split_index=split[0], split_total=split[1])
++
++
++def guide(para: str, text: str, cross_refs=(), split=(1, 1)) -> Chunk:
++    return Chunk(f"GR:p{para}#{split[0]}", "guide", "Group Relief Guide", "gr.pdf", text,
++                 path=f"Group Relief Guide > {para}", para=para, cite=f"Group Relief Guide, para {para}",
++                 cross_refs=list(cross_refs), split_index=split[0], split_total=split[1])
++
++
++CHUNKS = [   # tokens: 12, 16, 14, 17, 17, 13, 16, 13
++    act("10", "1", "Income tax is payable on gains or profits from any trade."),
++    act("10", "2", "In subsection (1), gains or profits means amounts received from a trade."),
++    act("37B", "1", "A transferor company may transfer a qualifying deduction under subsection (3).", part="2"),
++    act("37B", "3", "A qualifying deduction is a trade loss of the year, and capital allowances under section 19A",
++        part="2", cross_refs=["19A"], split=(1, 2)),
++    act("37B", "3", "of that year, to the extent not deducted against the transferor's own income.", part="2",
++        split=(2, 2)),
++    act("19A", "1", "An allowance is made for plant and machinery used in the trade.", part="3"),
++    guide("6.1", "A claimant company may claim the deduction as set out in paragraph 6.2.", cross_refs=["37B"]),
++    guide("6.2", "The claim is made in the return for the year of assessment."),
++]
++
++
++def ids(chunks) -> list[str]:
++    return [chunk.chunk_id for chunk in chunks]
++
++
++@pytest.fixture
++def graph() -> DependencyGraph:
++    return DependencyGraph(CHUNKS)
++
++
++def edges_of(edge_type: str) -> set[tuple[str, str]]:
++    return {(e["src"], e["dst"]) for e in build_edges(CHUNKS) if e["type"] == edge_type}
++
++
++def test_definitions_cross_references_and_split_pieces_are_edges():
++    assert edges_of("DEFINED_IN") == {("STA:s10(1)#1", "STA:s10(2)#1")}
++    refers = edges_of("REFERS_TO")
++    assert ("STA:s37B(1)#1", "STA:s37B(3)#1") in refers and ("STA:s37B(1)#1", "STA:s37B(3)#2") in refers
++    assert ("STA:s37B(3)#1", "STA:s19A(1)#1") in refers                      # cross_refs: section 19A
++    assert ("GR:p6.1#1", "GR:p6.2#1") in refers                              # paragraph 6.2 in the same guide
++    assert ("GR:p6.1#1", "STA:s37B(1)#1") in refers                          # cross_refs of a guide paragraph
++    assert edges_of("CONTINUES") == {("STA:s37B(3)#2", "STA:s37B(3)#1")}
++    assert {e["type"] for e in build_edges(CHUNKS)} == {"REFERS_TO", "DEFINED_IN", "CONTINUES"}
++
++
++def test_expansion_adds_the_definition_a_hit_depends_on(graph):
++    assert ids(graph.expand([CHUNKS[0]])) == ["STA:s10(2)#1"]
++
++
++def test_any_piece_of_a_split_subsection_resolves_a_reference_to_it(graph):
++    assert graph.unresolved("STA:s37B(1)#1", {"STA:s37B(1)#1"}) == 1
++    assert graph.unresolved("STA:s37B(1)#1", {"STA:s37B(1)#1", "STA:s37B(3)#2"}) == 0
++
++
++def test_expansion_follows_dependencies_of_dependencies_until_all_are_resolved(graph):
++    added = graph.expand([CHUNKS[2]])
++    assert {"STA:s37B(3)#1", "STA:s19A(1)#1"} <= set(ids(added))   # s 37B(3) cites s 19A
++    evidence = {CHUNKS[2].chunk_id} | set(ids(added))
++    assert all(graph.unresolved(id_, evidence) == 0 for id_ in evidence)
++
++
++def test_hits_are_never_repeated_and_dependencies_already_present_add_nothing(graph):
++    assert graph.expand([CHUNKS[0], CHUNKS[1]]) == []
++    assert graph.expand([CHUNKS[0], CHUNKS[0]]) == [CHUNKS[1]]
++
++
++def test_nothing_is_added_beyond_the_allowance_and_a_chunk_too_long_for_it_is_skipped(graph):
++    assert graph.expand([CHUNKS[0]], allowance=0) == []
++    assert graph.expand([CHUNKS[0]], allowance=12) == []                   # its definition has 16 tokens
++    assert ids(graph.expand([CHUNKS[0]], allowance=20)) == ["STA:s10(2)#1"]
++    assert ids(graph.expand([CHUNKS[2], CHUNKS[6]], allowance=20)) == ["GR:p6.2#1"]   # then s 37B(3) does not fit
++
++
++# Expected additions computed with the reference implementation, legal-agreement-ai's TaxGraph.expand with
++# dependency edges only and a zero similarity weight (condition R6y), on these chunks.
++REFERENCE = [
++    ([2], 450, 0.0, ["STA:s37B(3)#1", "STA:s37B(3)#2", "STA:s19A(1)#1"]),
++    ([2], 450, 2.0, ["STA:s37B(3)#1", "STA:s19A(1)#1"]),     # the heuristic avoids the piece that needs another
++    ([6], 450, 0.0, ["GR:p6.2#1", "STA:s37B(1)#1", "STA:s37B(3)#1", "STA:s37B(3)#2", "STA:s19A(1)#1"]),
++    ([6], 450, 2.0, ["GR:p6.2#1", "STA:s37B(1)#1", "STA:s37B(3)#1", "STA:s19A(1)#1"]),
++    ([2, 6], 450, 0.0, ["GR:p6.2#1", "STA:s37B(3)#1", "STA:s37B(3)#2", "STA:s19A(1)#1"]),
++    ([0, 2], 450, 0.0, ["STA:s10(2)#1", "STA:s37B(3)#1", "STA:s37B(3)#2", "STA:s19A(1)#1"]),
++    ([4], 450, 0.0, ["STA:s37B(3)#1", "STA:s19A(1)#1"]),
++]
++
++
++@pytest.mark.parametrize("hits, allowance, mu, expected", REFERENCE)
++def test_expansion_matches_the_reference_implementation(graph, hits, allowance, mu, expected):
++    assert ids(graph.expand([CHUNKS[i] for i in hits], allowance=allowance, mu=mu)) == expected
++
++
++SCOPES = [   # tokens: 13, 14, 7, 14, 8, 20, 18, 16, 6
++    act("50", "1", "In this section, relevant person means a company resident in Singapore."),
++    act("50", "2", "A relevant person may claim the allowance in the year it is incurred."),
++    act("50", "3", "The claim is made in writing."),
++    act("60", "1", "In this Part, approved fund means a fund approved by the Minister.", part="9"),
++    act("61", "1", "Contributions to an approved fund are deductible.", part="9"),
++    act("70", "1", "In subsection (2), qualifying cost means the cost of plant and machinery used in the trade."),
++    act("70", "2", "A deduction is allowed for qualifying cost under subsection (3) and subsection (4)."),
++    act("70", "3", "The deduction is spread over three years of assessment starting from the year of purchase."),
++    act("70", "4", "No deduction is allowed twice."),
++]
++
++
++def test_definitions_apply_to_their_section_part_or_subsections():
++    defined = {(e["src"], e["dst"]) for e in build_edges(SCOPES) if e["type"] == "DEFINED_IN"}
++    assert defined == {("STA:s50(2)#1", "STA:s50(1)#1"), ("STA:s50(3)#1", "STA:s50(1)#1"),   # "In this section"
++                       ("STA:s61(1)#1", "STA:s60(1)#1"),                                     # "In this Part"
++                       ("STA:s70(2)#1", "STA:s70(1)#1")}                                     # "In subsection (2)"
++
++
++def test_cheaper_edges_go_first_and_a_dependency_that_does_not_fit_is_skipped_not_the_end():
++    graph = DependencyGraph(SCOPES)
++    # the definition (DEFINED_IN, 0.2) before the referred subsections (REFERS_TO, 0.3), although it is the longest
++    assert ids(graph.expand([SCOPES[6]])) == ["STA:s70(1)#1", "STA:s70(4)#1", "STA:s70(3)#1"]
++    # with 17 tokens to spare the 20-token definition is skipped and the 6-token s 70(4) still added
++    assert ids(graph.expand([SCOPES[6]], allowance=17)) == ["STA:s70(4)#1"]
++
++
++def test_the_search_goes_on_past_a_dependency_too_long_for_what_is_left():
++    long = " ".join(["for that expenditure in each year of assessment"] * 18)
++    split = [   # tokens: 23, 152, 6
++        act("90", "1", "Where a company incurs expenditure on the provision of plant or machinery for the purposes "
++                       "of its trade, the company may claim", split=(1, 2)),
++        act("90", "1", f"an allowance under subsection (2) {long}.", split=(2, 2)),
++        act("90", "2", "The allowance is one third."),
++    ]
++    graph = DependencyGraph(split)
++    assert ids(graph.expand([split[1]])) == ["STA:s90(1)#1", "STA:s90(2)#1"]
++    # the earlier piece (CONTINUES, 0.1) comes off the frontier first but needs 23 tokens; s 90(2) still fits
++    assert ids(graph.expand([split[1]], allowance=20)) == ["STA:s90(2)#1"]
++
++
++@pytest.fixture
++def retriever(tmp_path):
++    embedder = HashEmbedder(dim=128)
++    (tmp_path / "structured").mkdir()
++    save_chunks(tmp_path / "structured" / "chunks.jsonl", CHUNKS)
++    BM25Index.build(ids(CHUNKS), [c.embed_text() for c in CHUNKS]).save(tmp_path / "structured" / "bm25.json")
++    DenseIndex.open(tmp_path / "chroma", "structured", embedder.name).build(CHUNKS, embedder)
++    return Retriever(tmp_path, embedder)
++
++
++def test_improved_astar_keeps_the_hits_of_improved_and_only_changes_the_expansion(retriever):
++    assert CONFIGS["improved_astar"] == RetrievalConfig("structured", bm25=True, dense=True, section_boost=True,
++                                                        expand_astar=True, bm25_only_for_section_refs=True)
++    question = "May a transferor company transfer a qualifying deduction?"
++    improved = retriever.search(question, "improved", k=1)
++    astar = retriever.search(question, "improved_astar", k=1)
++    assert ids(h.chunk for h in astar.hits) == ids(h.chunk for h in improved.hits) == ["STA:s37B(1)#1"]
++    assert ids(improved.expanded) == []                                      # s 37B(1) cites no other section
++    assert ids(astar.expanded) == ["STA:s37B(3)#1", "STA:s37B(3)#2", "STA:s19A(1)#1"]

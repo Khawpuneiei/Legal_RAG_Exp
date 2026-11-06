@@ -1,0 +1,29 @@
+{
+ "kept": 149,
+ "by_split": {
+  "dev": 50,
+  "test": 99
+ },
+ "by_type": {
+  "natural": 89,
+  "old_number": 6,
+  "out_of_scope": 30,
+  "section_ref": 24
+ },
+ "by_area": {
+  "A1": 30,
+  "A2": 30,
+  "A3": 29,
+  "A4": 30,
+  "A5": 30
+ },
+ "dropped": {
+  "type": 1
+ },
+ "dropped_detail": {
+  "type": [
+   "A3-08: type: natural question names s 14R"
+  ]
+ },
+ "sha256": "3684f7387d1460a7e733ce0b9ea684c256b0fa4805db155e291a7cf7cfae8aa6"
+}

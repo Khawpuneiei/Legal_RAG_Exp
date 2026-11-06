@@ -119,7 +119,14 @@ def run_skill_condition(cond: str, item: dict, ctx: Ctx) -> dict:
                       '\n\nWhich skill files do you need to load to draft this request? Return JSON {"load": ["<file path>", ...]} with at most 3 files.',
                       max_tokens=80, model=model)
         wanted = [p for p in (extract_json(pick) or {}).get("load", []) if isinstance(p, str)]
-        chosen = [p for p in sk.MODULE_INDEX if any(p == w.strip() or p.endswith(w.strip().split("/")[-1]) for w in wanted)][:3]
+        # in the model's order, matched by path or file name; an empty name matches nothing (the dev pilot's version
+        # matched every file on "" and capped in index order; fixed before the test run, docs/taxrag-rq12-protocol.md)
+        chosen = []
+        for w in (w.strip() for w in wanted):
+            match = next((p for p in sk.MODULE_INDEX if w.split("/")[-1] and (p == w or p.split("/")[-1] == w.split("/")[-1])), None)
+            if match and match not in chosen:
+                chosen.append(match)
+        chosen = chosen[:3]
         extra["loaded_modules"] = chosen
         sblock = sk.skill_block(skill["name"], skill["body"], {p: skill["modules"][p] for p in chosen})
         text = tr.llm("draft", f"The following skill is loaded.\n\n{sblock}\n\n{block}\n\n{TASK}\n\n{OUTPUT_CONTRACT}", model=model)
