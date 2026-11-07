@@ -3,7 +3,7 @@
 **Project:** AI-assisted legal agreement generation and workflow automation for a MAS-regulated fund manager (Singapore).
 **Live demo:** https://legal-agreement-ai.vercel.app (free tier, synthetic data, rules mode) · [presenter script](docs/demo-script.md)
 **Architecture:** [docs/architecture.md](docs/architecture.md) · **Deployment:** [docs/deployment.md](docs/deployment.md) · **Governance:** [docs/governance.md](docs/governance.md) · **Plan:** [docs/project-plan.md](docs/project-plan.md)
-**Status (1 November 2026):** Experiments 1, 2 and 3 are run on the frozen test split, and the Experiment 3 methods and RQ1/RQ2 have been tested on a teammate's Singapore income-tax RAG (TaxRAG). The application is deployed on a free tier (Vercel + Supabase, Singapore region), and the production kit (container image, Docker Compose, Helm chart, Terraform for Azure, CI) is in the repository and validated.
+**Status (7 November 2026):** Experiments 1, 2 and 3 are run on the frozen test split, and the Experiment 3 methods and RQ1/RQ2 have been tested on a teammate's Singapore income-tax RAG (TaxRAG). TaxRAG has also been run with Claude Opus 5.5 as its answer model and compared with IRAS's own chatbot, and Claude Opus 5.5 alone has been run on a public US tax-return benchmark ([results](docs/taxrag-claude-results.md)). The application is deployed on a free tier (Vercel + Supabase, Singapore region), and the production kit (container image, Docker Compose, Helm chart, Terraform for Azure, CI) is in the repository and validated.
 
 This README answers two research questions that the project plan left open:
 
@@ -24,7 +24,7 @@ The project has five research questions: RQ1–RQ3 from the [project plan](docs/
 | **RQ2** (plan): does an agent harness outperform a single LLM call? | **Answered** | Experiment 2: 7 harnesses × 90 requests × 3 seeds | **No** with a local 7B model; rules-first decomposition wins, below |
 | **RQ3** (plan): does a stronger retrieval pipeline improve accuracy and grounding? | **Answered** | Experiment 3: three benchmarks and a grounding eval | **Yes**, below |
 | **Q2** (README): does A\*-guided clause-graph retrieval help? | **Partly answered** | Experiment 3, conditions R6a–R6d | **Yes for almost self-contained evidence and more accurate citations; no against plain BFS**, below |
-| **TaxRAG** (transfer): do the Experiment 3 methods, and RQ1/RQ2, work on the teammate's Singapore income-tax RAG? | **Answered** | His corpus and code, 149 held-out questions, blind-judged answers ([methods](docs/taxrag-results.md), [RQ1/RQ2](docs/taxrag-rq12-results.md)) | **A\* transfers for evidence completeness; the reranker, the skill and a research pipeline do not; a retry of unusable replies helps a little (n.s.)**, with local 7–8B models, below |
+| **TaxRAG** (transfer): do the Experiment 3 methods, and RQ1/RQ2, work on the teammate's Singapore income-tax RAG? | **Answered** | His corpus and code, 149 held-out questions, blind-judged answers ([methods](docs/taxrag-results.md), [RQ1/RQ2](docs/taxrag-rq12-results.md), [on Claude](docs/taxrag-claude-results.md)) | **A\* transfers for evidence completeness; the reranker, the skill and a research pipeline do not; a retry of unusable replies helps a little (n.s.)**, with local 7–8B models. **His pipeline with Claude Opus 5.5 as the answer model scores 0.937 correct (all) on 79 questions, and 0.920 against the IRAS chatbot's 0.520 on a 25-question sample (mostly because the bot did not answer)**, below |
 | **Q1** (README): which production stack? | **Answered by building it** | [docs/architecture.md](docs/architecture.md), the live deployment, measured in `eval/results/deployed/` | Below |
 
 "Significant" means the 95% paired bootstrap CI of the difference excludes zero.
@@ -139,6 +139,23 @@ The project has five research questions: RQ1–RQ3 from the [project plan](docs/
 - **None of the three primary comparisons is significant after Holm.** 3 of the retry's 4 rescues came from a reply that ran out at the token cap with no text, and 2 of its 6 extra answers were wrong.
 - **The skill does not transfer:** unlike legal drafting (RQ1 below), the focused skill does not help tax answers (S2 −0.025, n.s.). In an exploratory count (not pre-registered, uncorrected), both whole-skill variants answered 14 test questions wrongly against B0's 5.
 - **Sent to his repo:** [Saiharshaa/SGtax-rag#6](https://github.com/Saiharshaa/SGtax-rag/pull/6) (open) adds two app toggles, both off by default: **Deep Tax Search** (R6y as `improved_astar`) and **Retry** (up to 2 retries of an unusable reply). It also always retries an empty reply, at most twice; replaying the recorded attempts this way gives 0.778 on test and 0.775 on dev. Deep Tax Research was dropped from the PR after this test. None of it has been run with his app's own models.
+
+**On Claude, against IRAS's chatbot, and on a public benchmark (7 November 2026).** Claude Opus 5.5 through the Anthropic API (`src/llm/claude.py`) as the answer model of his deployed pipeline, judged blind with the same design (243 distinct answers, κ 0.91; [details](docs/taxrag-claude-results.md)). His app itself runs gpt-oss-120b, still untested.
+
+| System | Questions | Answered | Correct (all) | Wrong |
+|---|---|---|---|---|
+| Claude Opus 5.5 in his pipeline | 79 | 78 | **0.937** | 1 |
+| qwen3:8b in his pipeline (earlier stand-in) | 79 | 71 | 0.715 | 5 |
+| Claude Opus 5.5 without retrieval | 79 | 79 | 0.589 | 19 |
+| Claude Opus 5.5 in his pipeline, 25-question sample | 25 | 25 | **0.920** | 1 |
+| IRAS Bot ("Chat with IRAS"), same 25 | 25 | 15 | 0.520 | 1 |
+
+- His pipeline with Claude beats the stand-in (+0.222 [+0.139, +0.304]), Claude without retrieval (+0.348 [+0.247, +0.456]) and, on the sample, the IRAS Bot (+0.400 [+0.180, +0.620]); a skeptical re-grade of the sample keeps every sample gap above 0.
+- The IRAS Bot is mostly right when it answers (0.867 on its 15, Claude in his pipeline 0.900 on the same); the gap is coverage: it asked for a question of at most 15 words 10 times.
+- Deep Tax Search makes no measurable difference on Claude either (0.949 against 0.943). No reply in his pipeline used more than 1,489 tokens; $0.037 an answer.
+- **TaxCalcBench** (Column Tax's public US tax-return benchmark, TY 2024, 51 returns; Claude Opus 5.5 alone, no retrieval): 64.71% of returns fully correct at the benchmark's default effort and 66.67% one level up, above the best published row (62.75%) but within one run's uncertainty, and at the same level ahead of the leaderboard's GPT-5.4 Pro (58.82%) and Claude Opus 4.6 (52.94%); the TY24 board stops at models of early 2026 and its answer keys are public, and on the newer TY25 set Column Tax's own board has Opus 5.5 at 42% (tied second) without web search.
+- chat.gov.sg was asked too, although the research notes had flagged that its terms of use forbid benchmarking it; its results are left out.
+- Caveats: Claude models judge Claude answers (blind, against the gold sections; the skeptical re-grade suggests the first judges were generous to Claude without retrieval); no person checked the grades; the questions were written by LLM agents from his corpus; the bot questions are long scenarios, not the short queries the IRAS Bot asks for.
 
 ### RQ1 — Does a SKILL.md playbook beat a vanilla LLM?
 

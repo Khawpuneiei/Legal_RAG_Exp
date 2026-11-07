@@ -13,6 +13,7 @@ resumed run spends nothing on what it already has. A daily quota stops the run; 
     python eval/tax_generation.py --model gemini --configs teammate-improved@gemini R6y@gemini --dry-run   # counts only
     python eval/tax_generation.py --model gemini --configs teammate-improved@gemini R6y@gemini   # -> *_gemini files
     python eval/tax_generation.py --model groq --configs teammate-improved@gemini R6y@gemini     # -> *_groq files
+    python eval/tax_generation.py --model claude --rpm 30 --configs teammate-improved@gemini   # Claude Opus 5.5 -> *_claude files
 """
 from __future__ import annotations
 
@@ -73,7 +74,7 @@ TRANSIENT_RETRIES = 6   # per answer, after the SDK's own retries: on 5xx and pe
 def transient(error: Exception) -> bool:
     """A server error or a per-minute limit (worth waiting for), not a daily quota (which stops the run)."""
     code = getattr(error, "code", None) or getattr(error, "status_code", None)
-    if code in (500, 502, 503, 504):
+    if code in (500, 502, 503, 504, 529):   # 529: Anthropic API overloaded
         return True
     text = str(error)
     return code == 429 and not any(m in text for m in ("PerDay", "per day", "(TPD)", "(RPD)"))
@@ -88,18 +89,19 @@ class CachedChat:
 
     def __init__(self, model, rpm: float, max_calls: int | None = None):
         self.model, self.name = model, model.name
-        self.cache = JsonCache("tax-answers-" + model.name.replace(":", "_").replace("/", "_"))
+        # a model with its own cache (ClaudeChat: keyed on model, effort, max_tokens and prompt) is not cached again here
+        self.cache = model.cache if hasattr(model, "cache") else JsonCache("tax-answers-" + model.name.replace(":", "_").replace("/", "_"))
         self.interval, self.max_calls, self.calls, self.next_at = 60.0 / rpm, max_calls, 0, 0.0
         self.lock = threading.Lock()
 
     def key(self, system: str, user: str) -> str:
-        return stable_hash(self.name, system, user)
+        return self.model.key(system, user) if hasattr(self.model, "cache") else stable_hash(self.name, system, user)
 
     def complete(self, system: str, user: str) -> str:
         key = self.key(system, user)
         hit = self.cache.get(key)
         if hit is not None:
-            return hit
+            return hit["text"] if isinstance(hit, dict) else hit
         for attempt in range(TRANSIENT_RETRIES + 1):
             with self.lock:   # reserve a start time; the calls themselves may overlap
                 if self.max_calls is not None and self.calls >= self.max_calls:
@@ -119,7 +121,8 @@ class CachedChat:
                 time.sleep(60 * (attempt + 1))
         with self.lock:   # only answers count towards --max-calls
             self.calls += 1
-            self.cache.put(key, text)
+            if not hasattr(self.model, "cache"):   # a model with its own cache has stored the reply already
+                self.cache.put(key, text)
             print(f"  call {self.calls}: {time.monotonic() - t0:.0f}s, {len(text)} chars", flush=True)
         return text
 
@@ -130,9 +133,9 @@ def main() -> None:
     ap.add_argument("--split", choices=["test", "dev"], default="test",
                     help="test: the teammate's 28 questions and the held-out test split; dev: the held-out dev split")
     ap.add_argument("--configs", nargs="*", default=None)
-    ap.add_argument("--model", choices=[MODEL, *REASONING, "groq", "gemini"], default=MODEL,
-                    help="qwen3:8b: a local reasoning model; groq / gemini: his app's chat model / its fallback (rag.llm). "
-                         "Results in *_qwen3-8b / *_groq / *_gemini files")
+    ap.add_argument("--model", choices=[MODEL, *REASONING, "groq", "gemini", "claude"], default=MODEL,
+                    help="qwen3:8b: a local reasoning model; groq / gemini: his app's chat model / its fallback (rag.llm); "
+                         "claude: Claude Opus 5.5 (src/llm/claude.py). Results in *_qwen3-8b / *_groq / *_gemini / *_claude files")
     ap.add_argument("--rpm", type=float, default=8.0, help="groq, gemini: requests per minute at most")
     ap.add_argument("--max-calls", type=int, default=None, help="groq, gemini: stop after this many new answers")
     ap.add_argument("--dry-run", action="store_true", help="count the model calls and prompt sizes; call nothing")
@@ -145,10 +148,17 @@ def main() -> None:
     gen = rag.generate
     llm = __import__("rag.llm", fromlist=["GeminiChat"])
     suffix = args.suffix if args.suffix is not None else "" if args.model == MODEL else "_" + args.model.replace(":", "-")
+    provider_errors = llm.PROVIDER_ERRORS
     if args.model == MODEL:
         chat = OllamaChat(num_ctx=args.num_ctx)
     elif args.model in REASONING:
         chat = OllamaChat(args.model, REASONING[args.model], args.num_ctx)
+    elif args.model == "claude":
+        import anthropic
+
+        from src.llm.claude import ClaudeChat
+        chat = CachedChat(ClaudeChat(), args.rpm, args.max_calls)
+        provider_errors = (*provider_errors, anthropic.APIError)
     else:
         chat = CachedChat(llm.GroqChat() if args.model == "groq" else llm.GeminiChat(), args.rpm, args.max_calls)
     gate = json.loads((OUT / "gate.json").read_text(encoding="utf-8"))
@@ -223,9 +233,10 @@ def main() -> None:
                    if prepared[(c, q.qset, q.id)][0] and not prepared[(c, q.qset, q.id)][1]]
         new = [p for p in prompts if not isinstance(chat, CachedChat) or chat.cache.get(chat.key(gen.SYSTEM_PROMPT, p)) is None]
         size = [rag.chunk.count_tokens(gen.SYSTEM_PROMPT + "\n" + p) for p in new]
+        cap = chat.model.max_tokens if args.model == "claude" else llm.MAX_ANSWER_TOKENS
         print(f"{len(jobs)} answers ({len(configs)} configs x {len(questions)} questions): {len(prompts)} need a model call, "
               f"{len(new)} of them not cached; prompts of {np.mean(size) if size else 0:.0f} word tokens on average, "
-              f"{sum(size):,} in all; output capped at {llm.MAX_ANSWER_TOKENS} tokens each, thinking included")
+              f"{sum(size):,} in all; output capped at {cap} tokens each, thinking included")
         return
     stop = threading.Event()
 
@@ -238,7 +249,7 @@ def main() -> None:
             return None
         try:
             raw = chat.complete(gen.SYSTEM_PROMPT, gen.build_prompt(q.question, sources))
-        except (CallCap, *llm.PROVIDER_ERRORS) as error:   # quota, outage or the cap: keep what is done, resume later
+        except (CallCap, *provider_errors) as error:   # quota, outage or the cap: keep what is done, resume later
             if not stop.is_set():
                 print(f"stopped: {type(error).__name__}: {error}", flush=True)
             stop.set()
