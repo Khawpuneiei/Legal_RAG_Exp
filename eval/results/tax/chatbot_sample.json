@@ -1,0 +1,127 @@
+[
+ {
+  "qid": "h003",
+  "type": "natural",
+  "question": "Harbour Holdings Pte Ltd acquired 100% of Bayfront Pte Ltd on 1 July 2024; its other subsidiary, Quayside Pte Ltd, has been wholly owned for years. All three have 31 December year ends. For YA 2025 Bayfront has a $400,000 unabsorbed trade loss and Quayside has assessable income of $1,000,000. How much of the loss can Quayside claim?"
+ },
+ {
+  "qid": "h011",
+  "type": "natural",
+  "question": "Ash Pte Ltd's Form GR A lists Fir Pte Ltd before Yew Pte Ltd, while Elm Pte Ltd's lists Yew before Fir. On the claimant side, Fir's Form GR B wants Elm's losses first and Yew's wants Ash's first, so the priorities cannot all be honoured. Whose ordering wins?"
+ },
+ {
+  "qid": "h021",
+  "type": "section_ref",
+  "question": "Kiwi Pte Ltd transfers $170,000 of current-year unabsorbed capital allowances, all relating to its income taxed at a 10% concessionary rate, to Papaya Pte Ltd, whose $500,000 of chargeable income is all taxed at 17%. Applying s 37B(17), by how much is Papaya's chargeable income reduced?"
+ },
+ {
+  "qid": "h023",
+  "type": "section_ref",
+  "question": "Two years after Plum Pte Ltd claimed $400,000 of losses from a sister company, IRAS finds that the sister's loss had been overstated by $150,000. What can the Comptroller do under s 37B(16)?"
+ },
+ {
+  "qid": "h042",
+  "type": "natural",
+  "question": "Mr Goh runs a printing business and a cafe as sole proprietor and also earns rent and interest. He is carrying back YA 2025 unabsorbed capital allowances from the printing business to YA 2024. In what order are his YA 2024 income sources used up?"
+ },
+ {
+  "qid": "h043",
+  "type": "natural",
+  "question": "A sole trader's two businesses have YA 2025 unabsorbed capital allowances of $120,000 and $60,000, and his YA 2024 assessable income is $300,000. How is the $100,000 he can carry back split between the two businesses?"
+ },
+ {
+  "qid": "h044",
+  "type": "natural",
+  "question": "Papa Pte Ltd has $30,000 of unabsorbed capital allowances and a $90,000 trade loss for YA 2025, against YA 2024 assessable income of $70,000. If it carries back, which item is used first and how much of each goes back?"
+ },
+ {
+  "qid": "h047",
+  "type": "natural",
+  "question": "Besides its YA 2025 trade loss, Sierra Pte Ltd has $25,000 of approved donations it could not use in YA 2025. Can it carry those donations back to YA 2024 together with the loss?"
+ },
+ {
+  "qid": "h051",
+  "type": "section_ref",
+  "question": "Under s 37D(8A), by what date must IRAS act if it finds that a YA 2021 qualifying deduction carried back under the three-year scheme against YA 2018 income was excessive?"
+ },
+ {
+  "qid": "h064",
+  "type": "natural",
+  "question": "A company was incorporated to build and sell terrace houses. It paid consultants for site feasibility studies in early 2024, completed its first land purchase in July 2024 and plans to launch sales in 2025. When does its business start for tax purposes?"
+ },
+ {
+  "qid": "h070",
+  "type": "natural",
+  "question": "Does a start-up need to attach the lease and invoices supporting its pre-revenue expense claims when it files its first corporate tax return?"
+ },
+ {
+  "qid": "h072",
+  "type": "natural",
+  "question": "A company incorporated in 2013 paid patent filing costs in 2014 and 2015, started trading on 1 January 2016, and was awarded a 10% incentive that took effect from 1 July 2016. Under the treatment that applied to those costs, against which income are they deducted?"
+ },
+ {
+  "qid": "h075",
+  "type": "natural",
+  "question": "Eight months before earning its first revenue, a start-up incurred costs that would have attracted a further deduction had it already been trading. Once revenue starts, can it claim the further deduction as well, or only the basic deduction?"
+ },
+ {
+  "qid": "h081",
+  "type": "section_ref",
+  "question": "Section 14(1) only allows expenses incurred in producing income, so the start date of a business matters. Does the Income Tax Act itself define when a business actually commences, or is that a question of fact?"
+ },
+ {
+  "qid": "h090",
+  "type": "section_ref",
+  "question": "How does s 14N(8A) apply the $300,000 renovation cap when a four-partner accounting firm refits its office? Does each partner get a separate cap?"
+ },
+ {
+  "qid": "h105",
+  "type": "natural",
+  "question": "A company should have registered for GST in 2024 but only registered in 2025 after IRAS caught up with it, and it had to pay out of its own pocket the GST it ought to have charged on its 2024 sales. Can it deduct that GST against its income, or is some other income tax relief available?"
+ },
+ {
+  "qid": "h111",
+  "type": "natural",
+  "question": "To install a heavy industrial oven, a bakery had to strengthen the floor slab and widen the doorway of its rented unit. Can those building works be added to the oven's cost for capital allowance purposes?"
+ },
+ {
+  "qid": "h128",
+  "type": "natural",
+  "question": "A Singapore subsidiary of a US group keeps its statutory accounts in US dollars because that is its functional currency. Which exchange rate should it use to convert its chargeable income into Singapore dollars for the tax computation?"
+ },
+ {
+  "qid": "h131",
+  "type": "natural",
+  "question": "A company that should have registered for GST in 2022 only registered in 2024, and had to pay IRAS the output tax on its earlier sales out of its own pocket. Those sales, including the GST element, were taxed as income for YA 2023. Can its YA 2023 income tax assessment be revised to give relief?"
+ },
+ {
+  "qid": "h132",
+  "type": "natural",
+  "question": "After the company's objection failed, IRAS issued a notice of refusal to amend dated 2 March 2026. What must the company lodge with the Board of Review to appeal, and by when?"
+ },
+ {
+  "qid": "h133",
+  "type": "natural",
+  "question": "Our firm's senior tax manager prepared a client company's appeal. She is neither a lawyer nor a public accountant. Can she represent the company at the Board of Review hearing?"
+ },
+ {
+  "qid": "h134",
+  "type": "natural",
+  "question": "A client has lodged an objection to its YA 2025 assessment. Can it hold back payment of the disputed tax until IRAS decides on the objection?"
+ },
+ {
+  "qid": "h135",
+  "type": "natural",
+  "question": "In both 2023 and 2024, the only person on my client's payroll was its sole shareholder, who also serves as its director, and the company paid CPF for her. Does it qualify for the $2,000 cash grant given with the YA 2024 and YA 2025 corporate income tax rebates?"
+ },
+ {
+  "qid": "h136",
+  "type": "natural",
+  "question": "In March 2026 a company finds that its YA 2022 tax return, which IRAS assessed in 2022, left out a deductible expense. Can it still ask IRAS for relief because of the mistake, and what is the deadline?"
+ },
+ {
+  "qid": "h142",
+  "type": "old_number",
+  "question": "My client, a Singapore manufacturing company, has held a 22% ordinary shareholding in an unlisted Singapore logistics company since mid-2022 and plans to sell the whole stake in March 2026. Will the gain be exempt under the former section 13Z?"
+ }
+]

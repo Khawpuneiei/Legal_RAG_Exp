@@ -31,6 +31,7 @@ experiments = [
     "tabulate>=0.9",
     "matplotlib>=3.9",
     "langgraph>=1.0",
+    "anthropic>=2.0",                   # Claude answer model for the TaxRAG benchmark runs (src/llm/claude.py)
 ]
 # Kubernetes / Docker runtime: direct Postgres store, queue worker, production server.
 postgres = [
