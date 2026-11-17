@@ -1,10 +1,41 @@
-# Legal Agreement AI
+# Legal + Tax RAG: benchmarks and experiments
+
+This repository benchmarks two retrieval-augmented generation (RAG) systems for Singapore professional work and runs experiments on them. What holds up is shipped to a real product: the Singapore tax assistant [Saiharshaa/SGtax-rag](https://github.com/Saiharshaa/SGtax-rag).
+
+| System | What it does | Where it lives |
+|---|---|---|
+| **Tax RAG** (the product) | Cited answers to Singapore corporate income-tax questions from the Income Tax Act 1947 and five IRAS e-Tax guides | App, code and slides: [Saiharshaa/SGtax-rag](https://github.com/Saiharshaa/SGtax-rag). Its benchmarks and experiments: this repository |
+| **Legal RAG** | Agreement drafting and review for a MAS-regulated fund manager, on synthetic data | This repository: the app ([live demo](https://legal-agreement-ai.vercel.app)), its benchmarks and experiments |
+
+New methods are built and benchmarked on the legal RAG first. They are then tested on the tax RAG with its own corpus, chunks, prompt and citation checker, on 149 held-out questions, with answers judged blind. Only what helps there goes into the product, and as a switch that is off by default when the evidence is thin.
+
+## From experiment to product
+
+| Tested on the tax RAG | Result (79 held-out test questions) | In the product |
+|---|---|---|
+| A\* dependency expansion (from legal Experiment 3) | The context resolves 0.706 of what the retrieved sections depend on, against 0.499; answers are level (qwen3:8b 0.766 vs 0.747, Claude Opus 5.5 0.949 vs 0.943) | **Deep Tax Search** switch, off by default ([#6](https://github.com/Saiharshaa/SGtax-rag/pull/6)) |
+| Retrying an unusable reply (RQ2) | +0.038 [+0.006, +0.082]: 4 questions better, none worse, not significant after Holm correction (p 0.375) | **Retry** switch, off by default; an empty reply is always retried ([#6](https://github.com/Saiharshaa/SGtax-rag/pull/6)) |
+| Claude Opus 5.5 as the answer model | 0.937, against 0.715 for the local qwen3:8b and 0.589 for Claude without retrieval. On 25 of the questions, 0.920 against 0.520 for IRAS's own chatbot. It declined all 14 out-of-scope questions; IRAS's chatbot declined 3 | Results and slides ([#8](https://github.com/Saiharshaa/SGtax-rag/pull/8), [#9](https://github.com/Saiharshaa/SGtax-rag/pull/9)). The app still answers with gpt-oss-120b, which is untested |
+| Skill playbook (RQ1), multi-search research pipeline (RQ2), cross-encoder reranker, contextual chunks, abstention gate | No gain on tax: skill −0.025, research pipeline −0.025 (both n.s.); the reranker lowers ranking quality (−0.129 MRR) | Not shipped |
+
+Details: [methods](docs/taxrag-results.md), [skills and harnesses](docs/taxrag-rq12-results.md), [Claude and the IRAS chatbot](docs/taxrag-claude-results.md), and the [TaxRAG section](#taxrag--do-the-experiment-3-methods-transfer-to-singapore-income-tax) below.
+
+**Benchmarks:**
+- **Legal RAG:** a frozen test split. Experiments 1 and 2 use 90 drafting requests × 3 seeds; Experiment 3 uses three retrieval benchmarks and a grounding evaluation.
+- **Tax RAG:** 149 held-out questions written from the corpus, with gold sections and paragraphs: a test split of 79 answerable and 20 out-of-scope questions, and a dev split of 40 and 10.
+  - **IRAS chatbot comparison:** 25 answerable and 14 out-of-scope questions.
+  - **TaxCalcBench:** a public US tax-return benchmark, run on Claude alone. It is outside the product's Singapore scope.
+- **Who wrote the tax questions:** LLM agents wrote and audited them, not tax professionals.
+
+## The legal RAG app
 
 **Project:** AI-assisted legal agreement generation and workflow automation for a MAS-regulated fund manager (Singapore).
 **Live demo:** https://legal-agreement-ai.vercel.app (free tier, synthetic data, rules mode) · [presenter script](docs/demo-script.md)
 **Architecture:** [docs/architecture.md](docs/architecture.md) · **Deployment:** [docs/deployment.md](docs/deployment.md) · **Governance:** [docs/governance.md](docs/governance.md) · **Plan:** [docs/project-plan.md](docs/project-plan.md)
-**TaxRAG (the Singapore tax app):** [Saiharshaa/SGtax-rag](https://github.com/Saiharshaa/SGtax-rag), with the app, its code, the BC3415 slides and short result summaries. This repository holds the full experiments run on it.
-**Status (7 November 2026):** Experiments 1, 2 and 3 are run on the frozen test split, and the Experiment 3 methods and RQ1/RQ2 have been tested on a teammate's Singapore income-tax RAG ([TaxRAG, Saiharshaa/SGtax-rag](https://github.com/Saiharshaa/SGtax-rag)). TaxRAG has also been run with Claude Opus 5.5 as its answer model and compared with IRAS's own chatbot, and Claude Opus 5.5 alone has been run on a public US tax-return benchmark ([results](docs/taxrag-claude-results.md)). The application is deployed on a free tier (Vercel + Supabase, Singapore region), and the production kit (container image, Docker Compose, Helm chart, Terraform for Azure, CI) is in the repository and validated.
+**Status (17 November 2026):**
+- **Legal RAG:** Experiments 1, 2 and 3 are run on the frozen test split.
+- **Tax RAG:** the Experiment 3 methods and RQ1/RQ2 have been tested on it ([TaxRAG, Saiharshaa/SGtax-rag](https://github.com/Saiharshaa/SGtax-rag)). It has also been run with Claude Opus 5.5 as its answer model and compared with IRAS's own chatbot, including on out-of-scope questions (10 November). Claude Opus 5.5 alone has been run on a public US tax-return benchmark ([results](docs/taxrag-claude-results.md)).
+- **Deployment:** the legal application runs on a free tier (Vercel + Supabase, Singapore region). The production kit (container image, Docker Compose, Helm chart, Terraform for Azure, CI) is in the repository and validated.
 
 This README answers two research questions that the project plan left open:
 
