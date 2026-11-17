@@ -144,6 +144,17 @@ IRAS Bot 0.520 (unchanged); Claude in his pipeline − IRAS Bot +0.380 [+0.140, 
 excludes 0. That the re-grade cut Claude without retrieval most suggests the first judges were generous to its fluent but
 unsourced answers.
 
+**Out-of-scope check (10 November 2026,
+[`eval/results/tax/chatbot_out_of_scope_summary.md`](../eval/results/tax/chatbot_out_of_scope_summary.md)).** The IRAS Bot was
+asked 14 of the 20 out-of-scope test questions, the ones outside IRAS's remit. The other 6, on GST and stamp duty, are IRAS's
+own subject. Same method as above, except the chat window now asks for a topic first, so "Corporate Income Tax" was used.
+- **The IRAS Bot declined 3,** pointing them to ACRA.
+- **It asked for a shorter question on 8.** All 14 are over its 15-word guidance, so this is not a clear refusal.
+- **It answered 3 Singapore CPF or Companies Act questions,** citing IRAS pages. These were not graded.
+- **It answered none of the 5 foreign-tax questions.**
+
+His pipeline with Claude declined all 14.
+
 ## A public benchmark: TaxCalcBench (US federal returns)
 
 No public Singapore tax benchmark with answers exists: the ACCA TX-SGP and ISCA/ACRA taxation papers are copyrighted and
